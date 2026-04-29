@@ -186,22 +186,24 @@ def do_quest_scan(
             status_cb(f"💬 Dialog — no button found, clicking centre ({dx}, {dy})")
         click(dx, dy, bounds)
         time.sleep(0.5)
-        quest_info = _build_quest_info(regions)
-        return quest_info, True
+        # Dialog handled — fall through to quest navigation below so the
+        # bot immediately picks up the next quest once the dialog clears.
 
-    # ── Step 1: Interaction button check ────────────────────────────────────
-    btn = _find_interaction_button(regions, screenshot)
-    if btn:
-        bx, by, blabel = btn
-        status_cb(
-            f"🖱  Found \"{blabel}\" at ({bx}, {by}) — clicking to complete interaction"
-        )
-        click(bx, by, bounds)
-        time.sleep(0.4)
-        quest_info = _build_quest_info(regions)
-        return quest_info, True
+    if not dlg:
+        # ── Step 1: Interaction button check ──────────────────────────────
+        btn = _find_interaction_button(regions, screenshot)
+        if btn:
+            bx, by, blabel = btn
+            status_cb(
+                f"🖱  Found \"{blabel}\" at ({bx}, {by}) — clicking to complete interaction"
+            )
+            click(bx, by, bounds)
+            time.sleep(0.4)
+            quest_info = _build_quest_info(regions)
+            return quest_info, True
 
     # ── Step 2: Quest row navigation ─────────────────────────────────────────
+    # Runs when: no dialog open, OR dialog just closed (dlg was set above).
     active_region = None
     quest_type    = None
 

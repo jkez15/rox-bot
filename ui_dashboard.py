@@ -33,16 +33,16 @@ import time
 LOG_MAX_LINES = 100
 REFRESH_MS    = 400          # UI refresh rate
 
-COLOUR_RUNNING = "#2ecc71"
-COLOUR_PAUSED  = "#f39c12"
-COLOUR_WAITING = "#3498db"
-COLOUR_STOPPED = "#e74c3c"
+COLOUR_RUNNING = "#2ecc71"   # green
+COLOUR_PAUSED  = "#27ae60"   # darker green
+COLOUR_WAITING = "#1abc9c"   # teal-green
+COLOUR_STOPPED = "#e74c3c"   # red (keep — stop is always red)
 COLOUR_BG      = "#1a1a2e"
 COLOUR_PANEL   = "#16213e"
 COLOUR_TEXT    = "#eaeaea"
 COLOUR_DIM     = "#7f8c8d"
-COLOUR_ACCENT  = "#e94560"
-COLOUR_START   = "#27ae60"
+COLOUR_ACCENT  = "#2ecc71"   # green header
+COLOUR_START   = "#27ae60"   # Start button green
 
 # Automation tasks: (internal_name, display_label, enabled_by_default)
 AUTOMATION_TASKS: list[tuple[str, str, bool]] = [
@@ -158,8 +158,8 @@ class Dashboard:
         root.title("RöX Bot")
         root.configure(bg=COLOUR_BG)
         root.attributes("-topmost", True)
-        root.resizable(False, False)
-        root.geometry("370x560+40+60")
+        root.resizable(False, True)
+        root.geometry("420x680+40+60")
 
         # ── Header ────────────────────────────────────────────────────────
         hdr = tk.Frame(root, bg=COLOUR_ACCENT, pady=4)
@@ -297,7 +297,7 @@ class Dashboard:
 
         # ── Button row ────────────────────────────────────────────────────
         btn_frame = tk.Frame(root, bg=COLOUR_BG, padx=8, pady=6)
-        btn_frame.pack(fill="x")
+        btn_frame.pack(fill="x", side="bottom")
 
         btn_cfg = dict(font=("SF Pro Text", 11, "bold"), relief="flat",
                        padx=10, pady=5, cursor="hand2", bd=0)
@@ -313,7 +313,7 @@ class Dashboard:
         self._lower_frame = tk.Frame(btn_frame, bg=COLOUR_BG)
 
         self._pause_btn = tk.Button(
-            self._lower_frame, text="⏸  Pause", bg="#f39c12", fg="white",
+            self._lower_frame, text="⏸  Pause", bg="#27ae60", fg="white",
             command=self._toggle_pause, **btn_cfg
         )
         self._pause_btn.pack(side="left", expand=True, fill="x", padx=(0, 4))
@@ -365,7 +365,7 @@ class Dashboard:
         if paused:
             self._pause_btn.config(text="▶  Resume", bg=COLOUR_RUNNING)
         else:
-            self._pause_btn.config(text="⏸  Pause", bg="#f39c12")
+            self._pause_btn.config(text="⏸  Pause", bg="#27ae60")
 
     def _request_stop(self) -> None:
         with self._lock:
