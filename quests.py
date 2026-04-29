@@ -47,20 +47,31 @@ INTERACTION_PATTERNS = [
     r"\bTalk\b",
 ]
 
-# Buttons that appear INSIDE an NPC dialog box to advance or close it.
-# Order = preference (Inquire closes the quest dialog; Next/Continue advances).
-# OCR often mangles 'Inquire' → '(Inquire:. |', so use a loose substring match.
-DIALOG_PATTERNS = [
-    r"Inquir",      # 'Inquire' button — closes/completes quest conversation
-    r"\bNext\b",   # advance to next line of dialogue
-    r"Continu",    # 'Continue'
-    r"\bClose\b",  # close dialog after quest update
-    r"\bSkip\b",   # skip the whole conversation
+# Skip button pattern — first preference when dialog is open.
+SKIP_PATTERN = r"\bSkip\b"
+
+# Choice / advance buttons on the RIGHT side of the screen (cx > DIALOG_CHOICE_X_MIN).
+# These appear when the dialog offers selectable options with no Skip available.
+DIALOG_CHOICE_PATTERNS = [
+    r"Inquir",      # 'Inquire' — closes/completes quest conversation
+    r"\bNext\b",    # advance dialogue line
+    r"Continu",     # 'Continue'
+    r"\bClose\b",   # dismiss after quest update
+    r"\bOk\b",
+    r"\bYes\b",
+    r"\bAgree\b",
 ]
 
-# NPC dialog is considered open when speech text appears in the lower portion
-# of the screen (below this y threshold) AND a dialog button is found.
+# Right-side choices have cx above this threshold (right portion of screen).
+DIALOG_CHOICE_X_MIN = 650   # logical pixels
+
+# NPC dialog is considered open when speech text appears near the bottom.
 DIALOG_TEXT_Y_MIN = 600   # logical pixels
+
+# Centre of the game world — used as spam-click fallback to advance dialog.
+# Approximately mid-screen excluding the UI panels.
+DIALOG_SPAM_X = 525   # logical pixels (centre x)
+DIALOG_SPAM_Y = 420   # logical pixels (centre y)
 
 # cx threshold: anything left of this is inside the quest-panel sidebar.
 QUEST_PANEL_X_MAX = 260   # logical pixels
@@ -79,30 +90,40 @@ def _extract_target(text: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
-def _find_dialog_button(regions):
+def _find_dialog_button(regions, bounds_w: int = 1051):
     """
-    Detect an open NPC conversation dialog and return (cx, cy, label)
-    of the button to click, or None.
+    Determine what to do when an NPC dialog is open.
 
-    A dialog is considered active when:
-      • speech text is detected near the bottom of the screen (cy > DIALOG_TEXT_Y_MIN), OR
-      • a known dialog button label is found anywhere outside the sidebar.
+    Returns (cx, cy, label, action) where action is one of:
+      'skip'   — Skip button found → click it
+      'choice' — selectable option on right side → click first found
+      'spam'   — no specific button; caller should spam-click centre
+    Returns None if no dialog appears to be open.
+
+    Dialog is detected when NPC speech text appears near the bottom of
+    the screen (cy > DIALOG_TEXT_Y_MIN).
     """
-    # Check if NPC speech is present at the bottom of the screen
     has_speech = any(
         r.cy > DIALOG_TEXT_Y_MIN and r.cx > QUEST_PANEL_X_MAX
         for r in regions
         if r.conf >= MIN_CONF_DIALOG
     )
+    if not has_speech:
+        return None
 
-    for pattern in DIALOG_PATTERNS:
+    # 1. Skip — highest preference, always click it if present
+    skip_r = find_text(regions, SKIP_PATTERN, min_conf=MIN_CONF_DIALOG)
+    if skip_r and skip_r.cx > QUEST_PANEL_X_MAX:
+        return skip_r.cx, skip_r.cy, skip_r.text, "skip"
+
+    # 2. Right-side choice buttons
+    for pattern in DIALOG_CHOICE_PATTERNS:
         r = find_text(regions, pattern, min_conf=MIN_CONF_DIALOG)
-        if r and r.cx > QUEST_PANEL_X_MAX:
-            # Only treat Skip as valid if speech is present (avoid false positives)
-            if "Skip" in pattern and not has_speech:
-                continue
-            return r.cx, r.cy, r.text
-    return None
+        if r and r.cx > DIALOG_CHOICE_X_MIN:
+            return r.cx, r.cy, r.text, "choice"
+
+    # 3. Fallback — spam-click centre of game world to advance
+    return DIALOG_SPAM_X, DIALOG_SPAM_Y, "screen", "spam"
 
 
 # How many pixels above the "Examine" / "Inspect" text the icon button sits.
@@ -156,10 +177,13 @@ def do_quest_scan(
     # ── Step 0: Dialog advancement (highest priority) ─────────────────────
     dlg = _find_dialog_button(regions)
     if dlg:
-        dx, dy, dlabel = dlg
-        status_cb(
-            f"💬 Dialog open — clicking \"{dlabel}\" at ({dx}, {dy}) to advance"
-        )
+        dx, dy, dlabel, action = dlg
+        if action == "skip":
+            status_cb(f"💬 Dialog — clicking Skip at ({dx}, {dy})")
+        elif action == "choice":
+            status_cb(f"💬 Dialog choice — clicking \"{dlabel}\" at ({dx}, {dy})")
+        else:
+            status_cb(f"💬 Dialog — no button found, clicking centre ({dx}, {dy})")
         click(dx, dy, bounds)
         time.sleep(0.5)
         quest_info = _build_quest_info(regions)
