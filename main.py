@@ -1,13 +1,19 @@
 """
 main.py – RöX Automation Bot entry point.
 
-Architecture:
-  • Main thread   → Tkinter dashboard UI
-  • Worker thread → detection + capture + quest automation loop
+Architecture
+------------
+  Main thread   → Tkinter dashboard (ui_dashboard.py)
+  Worker thread → automation loop (detect → OCR → click)
 
-Usage:
-    source .venv/bin/activate
-    python main.py
+The worker thread is started immediately but blocks on
+Dashboard.wait_for_start() until the user presses ▶ Start.
+This keeps the UI responsive at all times.
+
+Usage
+-----
+  source .venv/bin/activate
+  python main.py
 """
 
 import sys
@@ -16,40 +22,53 @@ import threading
 
 from config import POLL_INTERVAL, LOOP_INTERVAL, QUEST_CLICK_INTERVAL
 from detector import is_rox_running
-from actions import focus_rox
-from quests import run_quest_cycle, get_quest_info
+from quests import do_quest_scan
 from ui_dashboard import Dashboard
 
 
-# ── Worker thread ────────────────────────────────────────────────────────────
+# ── Worker thread ─────────────────────────────────────────────────────────────
 
 def automation_loop(dash: Dashboard) -> None:
     """
-    Runs on a background thread.
-    Waits for RöX → runs quest automation → loops until stopped.
-    """
-    dash.log("Bot started — looking for RöX…")
+    Runs on a background daemon thread.
 
+    1. Waits (blocking) until the user clicks ▶ Start in the dashboard.
+    2. Waits for RöX to be running.
+    3. Runs one OCR pass per cycle:
+       - reads quest text
+       - clicks the NPC in the world, or falls back to the quest row
+       - updates the dashboard with quest info and action log
+    4. Respects Pause / Stop at every iteration.
+    """
+    dash.log("Bot ready — press ▶ Start when you're in RöX")
+    dash.set_status("idle", "Press ▶ Start to begin")
+
+    # ── Gate: wait for Start button ───────────────────────────────────────────
+    if not dash.wait_for_start():
+        return   # Stop was pressed before Start
+
+    dash.log("▶ Bot started")
+
+    # ── Main loop ─────────────────────────────────────────────────────────────
     while not dash.is_stop_requested():
 
-        # ── Phase 1: wait for RöX ────────────────────────────────────────
+        # Phase 1 — wait for RöX process
         if not is_rox_running():
-            dash.set_status("waiting", "Waiting for RöX to start…")
+            dash.set_status("waiting", "Waiting for RöX to launch…")
             dash.set_action("Polling for RöX process…")
             dash.log("RöX not running — waiting…")
+
             while not is_rox_running():
                 if dash.is_stop_requested():
                     return
                 time.sleep(POLL_INTERVAL)
 
-        # ── Phase 2: RöX is open ─────────────────────────────────────────
+        # Phase 2 — RöX is running
         dash.mark_started()
         dash.set_status("running", "RöX detected — automation active")
-        dash.log("✅ RöX detected! Starting automation.")
-        focus_rox()
-        time.sleep(0.5)
+        dash.log("✅ RöX detected")
 
-        last_quest_click = 0.0
+        last_click_t = 0.0
 
         while is_rox_running() and not dash.is_stop_requested():
 
@@ -62,38 +81,40 @@ def automation_loop(dash: Dashboard) -> None:
 
             dash.increment_cycle()
 
-            # ── Quest info for dashboard ─────────────────────────────────
-            quest = get_quest_info()
-            if quest:
-                dash.set_status(
-                    "running",
-                    f"[{quest['type']}] {quest['title']}"
-                    + (f"  |  {quest['distance']}" if quest.get("distance") else "")
-                )
-
-            # ── Quest automation ─────────────────────────────────────────
             now = time.time()
-            if now - last_quest_click >= QUEST_CLICK_INTERVAL:
+            if now - last_click_t >= QUEST_CLICK_INTERVAL:
 
-                def status_cb(msg: str) -> None:
+                def _status(msg: str) -> None:
                     dash.set_action(msg)
                     dash.log(msg)
 
                 try:
-                    clicked = run_quest_cycle(status_cb=status_cb)
+                    quest_info, clicked = do_quest_scan(status_cb=_status)
                 except Exception as exc:
-                    dash.log(f"⚠️  Error: {exc}")
-                    clicked = False
+                    dash.log(f"⚠️  Error in quest scan: {exc}")
+                    quest_info, clicked = None, False
+
+                # Push quest info to dashboard
+                dash.set_quest(quest_info)
+
+                if quest_info:
+                    qtype = quest_info.get("type", "?")
+                    title = quest_info.get("title", "")
+                    dist  = quest_info.get("distance", "")
+                    dash.set_status(
+                        "running",
+                        f"[{qtype}] {title}" + (f"  |  {dist}" if dist else "")
+                    )
 
                 if clicked:
                     dash.increment_quests()
-                    last_quest_click = time.time()
-                    dash.set_status("running", "Quest clicked — waiting for character to move…")
+                    last_click_t = time.time()
                 else:
-                    dash.set_status("running", "RöX active — monitoring quest panel…")
+                    dash.set_status("running", "Monitoring quest panel…")
+
             else:
-                remaining = int(QUEST_CLICK_INTERVAL - (now - last_quest_click))
-                dash.set_action(f"⏳ Next quest click in {remaining}s…")
+                remaining = int(QUEST_CLICK_INTERVAL - (now - last_click_t))
+                dash.set_action(f"⏳ Next scan in {remaining}s…")
 
             time.sleep(LOOP_INTERVAL)
 
@@ -102,18 +123,24 @@ def automation_loop(dash: Dashboard) -> None:
             dash.log("RöX was closed. Waiting for it to reopen…")
 
     dash.set_status("stopped", "Bot stopped")
-    dash.log("Bot stopped by user.")
+    dash.log("🛑 Bot stopped.")
 
 
-# ── Entry point ──────────────────────────────────────────────────────────────
+# ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> None:
     dash = Dashboard()
 
-    worker = threading.Thread(target=automation_loop, args=(dash,), daemon=True)
+    # Worker thread starts immediately but blocks until Start is clicked
+    worker = threading.Thread(
+        target=automation_loop,
+        args=(dash,),
+        daemon=True,
+        name="rox-worker"
+    )
     worker.start()
 
-    # Dashboard.build() blocks on the main thread (Tkinter mainloop)
+    # Dashboard.build() runs Tkinter mainloop on the main thread (blocks)
     dash.build()
 
     sys.exit(0)
