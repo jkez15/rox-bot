@@ -1,18 +1,28 @@
 """
 quests.py – Quest automation for RöX using OCR text detection.
 
-Quest cycle (three-step state machine per scan)
-------------------------------------------------
-  Step 0 — DIALOG ADVANCEMENT (highest priority)
+Quest cycle (priority-ordered state machine per scan)
+-----------------------------------------------------
+  Step 0 — PATHFINDING IDLE (highest priority)
+    If 'Pathfinding' text is on screen, the character is auto-walking.
+    Do NOTHING — no clicks at all — until it disappears.
+
+  Step 1 — DIALOG ADVANCEMENT
     If an NPC conversation dialog is open (detected by dialogue button labels
     like 'Inquire', 'Next', 'Continue', or NPC speech text at the bottom of
     the screen), click the appropriate button to advance or close the dialog.
 
-  Step 1 — INTERACTION CHECK
+  Step 2 — INTERACTION CHECK
     If 'Examine' or 'Inspect' button is visible, click the icon button
     above it (yellow magnifying-glass).  This opens the NPC dialog.
 
-  Step 2 — QUEST NAVIGATION (only if no dialog or interaction button found)
+  Step 3 — SMART ACTION BUTTONS
+    Scan for ANY interactive button in the game-world area (right side of
+    screen, outside the quest panel).  This catches quest-specific actions
+    like 'Photograph', 'Collect', 'Use', 'Activate', 'Open', etc. without
+    needing hardcoded support for every quest type.
+
+  Step 4 — QUEST NAVIGATION (lowest priority)
     Find the highest-priority quest row: [Main] > [Tutorial].
     Click it ONCE so the game sets it as the active navigation target.
 
@@ -28,11 +38,17 @@ import time
 from typing import Callable
 
 from capture import capture_window
-from ocr import read_window, find_text
+from ocr import read_window, find_text, find_all_text
 from actions import click
 
 
 # ── Config ───────────────────────────────────────────────────────────────────
+
+# ── Pathfinding detection ────────────────────────────────────────────────────
+# When this text is visible the character is auto-walking to a destination.
+# The bot must NOT click anything while pathfinding is active.
+PATHFINDING_PATTERN = r"Pathfinding|Path\s*finding|Auto.?walk"
+MIN_CONF_PATHFINDING = 0.30
 
 # Quest types in strict priority order — first match wins.
 QUEST_PRIORITY: list[tuple[str, str]] = [
@@ -46,6 +62,78 @@ INTERACTION_PATTERNS = [
     r"\bInspect\b",
     r"\bTalk\b",
 ]
+
+# ── Smart action-button patterns ─────────────────────────────────────────────
+# Broad set of interactive button labels that quests might show in the game
+# world area.  Adding a pattern here is all that's needed to handle a new
+# quest action — no other code changes required.
+#
+# These are checked OUTSIDE the quest panel (cx > QUEST_PANEL_X_MAX) and
+# ABOVE the dialog zone (cy < DIALOG_TEXT_Y_MIN) so they don't collide with
+# dialog buttons or quest-row text.
+ACTION_BUTTON_PATTERNS: list[str] = [
+    # Photography / camera quests
+    r"\bPhotograph\b",
+    r"\bPhoto\b",
+    r"\bCapture\b",
+    r"\bSnapshot\b",
+    r"\bCamera\b",
+    r"\bShoot\b",
+    # Collection / gathering
+    r"\bCollect\b",
+    r"\bGather\b",
+    r"\bPick\s*up\b",
+    r"\bLoot\b",
+    r"\bHarvest\b",
+    # Interaction / activation
+    r"\bActivate\b",
+    r"\bUse\b",
+    r"\bOpen\b",
+    r"\bInteract\b",
+    r"\bTouch\b",
+    r"\bPress\b",
+    r"\bPush\b",
+    r"\bPull\b",
+    r"\bPlace\b",
+    r"\bDrop\b",
+    # Combat / dungeon
+    r"\bAttack\b",
+    r"\bFight\b",
+    r"\bEnter\b",
+    r"\bChallenge\b",
+    r"\bStart\b",
+    r"\bBegin\b",
+    # Delivery / quest hand-in
+    r"\bDeliver\b",
+    r"\bGive\b",
+    r"\bHand\s*over\b",
+    r"\bSubmit\b",
+    r"\bTurn\s*in\b",
+    # Miscellaneous quest actions
+    r"\bRepair\b",
+    r"\bCraft\b",
+    r"\bBuild\b",
+    r"\bSummon\b",
+    r"\bPlay\b",
+    r"\bRead\b",
+    r"\bSearch\b",
+    r"\bDig\b",
+    r"\bFish\b",
+    r"\bCook\b",
+    r"\bBrew\b",
+    r"\bAccept\b",
+    r"\bConfirm\b",
+    r"\bComplete\b",
+    r"\bClaim\b",
+    r"\bReceive\b",
+]
+
+MIN_CONF_ACTION = 0.30   # action buttons may be styled / small
+
+# Action buttons must be in this screen zone (game world, not quest panel,
+# not dialog area).
+ACTION_BUTTON_X_MIN = 260   # right of quest panel
+ACTION_BUTTON_Y_MAX = 600   # above dialog zone
 
 # Skip button pattern — first preference when dialog is open.
 SKIP_PATTERN = r"\bSkip\b"
@@ -147,6 +235,27 @@ def _find_interaction_button(regions, screenshot=None):
     return None
 
 
+def _is_pathfinding(regions) -> bool:
+    """Return True if 'Pathfinding' (or similar) text is visible on screen."""
+    r = find_text(regions, PATHFINDING_PATTERN, min_conf=MIN_CONF_PATHFINDING)
+    return r is not None
+
+
+def _find_action_button(regions):
+    """
+    Scan for any interactive action button in the game-world area.
+
+    Returns (cx, cy, label) of the first matching button, or None.
+    Buttons must be in the game-world zone (right of quest panel, above
+    dialog area) to avoid false positives from quest text or dialog choices.
+    """
+    for pattern in ACTION_BUTTON_PATTERNS:
+        r = find_text(regions, pattern, min_conf=MIN_CONF_ACTION)
+        if r and r.cx > ACTION_BUTTON_X_MIN and r.cy < ACTION_BUTTON_Y_MAX:
+            return r.cx, r.cy, r.text
+    return None
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def do_quest_scan(
@@ -174,7 +283,13 @@ def do_quest_scan(
         status_cb("No text detected in window")
         return None, False
 
-    # ── Step 0: Dialog advancement (highest priority) ─────────────────────
+    # ── Step 0: Pathfinding idle (highest priority) ───────────────────────
+    if _is_pathfinding(regions):
+        status_cb("🚶 Pathfinding active — waiting for arrival…")
+        quest_info = _build_quest_info(regions)
+        return quest_info, False   # no click — just wait
+
+    # ── Step 1: Dialog advancement ────────────────────────────────────────
     dlg = _find_dialog_button(regions)
     if dlg:
         dx, dy, dlabel, action = dlg
@@ -190,7 +305,7 @@ def do_quest_scan(
         # bot immediately picks up the next quest once the dialog clears.
 
     if not dlg:
-        # ── Step 1: Interaction button check ──────────────────────────────
+        # ── Step 2: Interaction button check ──────────────────────────────
         btn = _find_interaction_button(regions, screenshot)
         if btn:
             bx, by, blabel = btn
@@ -202,7 +317,19 @@ def do_quest_scan(
             quest_info = _build_quest_info(regions)
             return quest_info, True
 
-    # ── Step 2: Quest row navigation ─────────────────────────────────────────
+        # ── Step 3: Smart action button scan ──────────────────────────────
+        action_btn = _find_action_button(regions)
+        if action_btn:
+            ax, ay, alabel = action_btn
+            status_cb(
+                f"🎯 Action button \"{alabel}\" at ({ax}, {ay}) — clicking"
+            )
+            click(ax, ay, bounds)
+            time.sleep(0.4)
+            quest_info = _build_quest_info(regions)
+            return quest_info, True
+
+    # ── Step 4: Quest row navigation ────────────────────────────────────────
     # Runs when: no dialog open, OR dialog just closed (dlg was set above).
     active_region = None
     quest_type    = None
