@@ -1,12 +1,13 @@
 """
 ui_dashboard.py – Floating status dashboard for the RöX bot.
 
-Layout
+Layout  (compact, always-on-top)
 ------
   • Header bar (accent colour)
   • Status card  — dot + status text + current action
-  • Stats row    — Cycles / Quests clicked / Elapsed
   • Quest card   — active quest type, title, target, distance
+  • Task checklist — toggle individual automation features
+  • Stats row    — Cycles / Quests clicked / Elapsed
   • Activity log — scrollable timestamped entries
   • Button row   — Start → (Pause/Resume) + Stop
 
@@ -42,6 +43,15 @@ COLOUR_TEXT    = "#eaeaea"
 COLOUR_DIM     = "#7f8c8d"
 COLOUR_ACCENT  = "#e94560"
 COLOUR_START   = "#27ae60"
+
+# Automation tasks: (internal_name, display_label, enabled_by_default)
+AUTOMATION_TASKS: list[tuple[str, str, bool]] = [
+    ("quests",        "Quests",         True),
+    ("daily_rewards", "Daily Rewards",  False),
+    ("auto_potion",   "Auto-Potion",    False),
+    ("party_accept",  "Party Accept",   False),
+    ("farming",       "Farming",        False),
+]
 
 
 class Dashboard:
@@ -80,6 +90,11 @@ class Dashboard:
 
         # Active quest info (set by worker, read by UI)
         self._quest: dict | None = None
+
+        # Task enable/disable states (synced from UI checkboxes each refresh)
+        self._task_states: dict[str, bool] = {
+            name: default for name, _, default in AUTOMATION_TASKS
+        }
 
         self._root: tk.Tk | None = None
 
@@ -129,6 +144,11 @@ class Dashboard:
         with self._lock:
             return self._stop_requested
 
+    def is_task_enabled(self, task_name: str) -> bool:
+        """Check whether a named automation task is enabled (thread-safe)."""
+        with self._lock:
+            return self._task_states.get(task_name, False)
+
     # ── Tkinter UI (main thread only) ────────────────────────────────────────
 
     def build(self) -> None:
@@ -139,92 +159,116 @@ class Dashboard:
         root.configure(bg=COLOUR_BG)
         root.attributes("-topmost", True)
         root.resizable(False, False)
-        root.geometry("440x620+40+60")
+        root.geometry("370x560+40+60")
 
         # ── Header ────────────────────────────────────────────────────────
-        hdr = tk.Frame(root, bg=COLOUR_ACCENT, pady=7)
+        hdr = tk.Frame(root, bg=COLOUR_ACCENT, pady=4)
         hdr.pack(fill="x")
         tk.Label(
             hdr, text="⚔  RöX Automation Bot",
-            font=("SF Pro Display", 15, "bold"),
+            font=("SF Pro Display", 13, "bold"),
             fg="white", bg=COLOUR_ACCENT
         ).pack()
 
         # ── Status card ───────────────────────────────────────────────────
-        card = tk.Frame(root, bg=COLOUR_PANEL, padx=14, pady=10)
-        card.pack(fill="x", padx=10, pady=(10, 0))
+        card = tk.Frame(root, bg=COLOUR_PANEL, padx=10, pady=6)
+        card.pack(fill="x", padx=8, pady=(6, 0))
 
         row1 = tk.Frame(card, bg=COLOUR_PANEL)
         row1.pack(fill="x")
-        tk.Label(row1, text="STATUS", font=("SF Pro Text", 9, "bold"),
+        tk.Label(row1, text="STATUS", font=("SF Pro Text", 8, "bold"),
                  fg=COLOUR_DIM, bg=COLOUR_PANEL).pack(side="left")
-        self._status_dot = tk.Label(row1, text="●", font=("SF Pro Text", 14),
+        self._status_dot = tk.Label(row1, text="●", font=("SF Pro Text", 12),
                                     fg=COLOUR_WAITING, bg=COLOUR_PANEL)
         self._status_dot.pack(side="right")
 
         self._status_lbl = tk.Label(
             card, text="Press ▶ Start to begin",
-            font=("SF Pro Text", 11), fg=COLOUR_TEXT, bg=COLOUR_PANEL,
-            anchor="w", wraplength=390
+            font=("SF Pro Text", 10), fg=COLOUR_TEXT, bg=COLOUR_PANEL,
+            anchor="w", wraplength=320
         )
-        self._status_lbl.pack(fill="x", pady=(2, 6))
+        self._status_lbl.pack(fill="x", pady=(1, 4))
 
-        ttk.Separator(card, orient="horizontal").pack(fill="x", pady=4)
+        ttk.Separator(card, orient="horizontal").pack(fill="x", pady=2)
 
-        tk.Label(card, text="CURRENT ACTION", font=("SF Pro Text", 9, "bold"),
+        tk.Label(card, text="CURRENT ACTION", font=("SF Pro Text", 8, "bold"),
                  fg=COLOUR_DIM, bg=COLOUR_PANEL, anchor="w").pack(fill="x")
         self._action_lbl = tk.Label(
             card, text="—",
-            font=("SF Pro Text", 10, "italic"), fg="#a8d8ea", bg=COLOUR_PANEL,
-            anchor="w", wraplength=390
+            font=("SF Pro Text", 9, "italic"), fg="#a8d8ea", bg=COLOUR_PANEL,
+            anchor="w", wraplength=320
         )
-        self._action_lbl.pack(fill="x", pady=(2, 0))
+        self._action_lbl.pack(fill="x", pady=(1, 0))
 
         # ── Quest info card ───────────────────────────────────────────────
-        qcard = tk.Frame(root, bg=COLOUR_PANEL, padx=14, pady=8)
-        qcard.pack(fill="x", padx=10, pady=(6, 0))
+        qcard = tk.Frame(root, bg=COLOUR_PANEL, padx=10, pady=6)
+        qcard.pack(fill="x", padx=8, pady=(4, 0))
 
-        tk.Label(qcard, text="ACTIVE QUEST", font=("SF Pro Text", 9, "bold"),
+        tk.Label(qcard, text="ACTIVE QUEST", font=("SF Pro Text", 8, "bold"),
                  fg=COLOUR_DIM, bg=COLOUR_PANEL, anchor="w").pack(fill="x")
 
         self._quest_type_lbl = tk.Label(
             qcard, text="—",
-            font=("SF Pro Text", 10, "bold"), fg=COLOUR_RUNNING, bg=COLOUR_PANEL,
+            font=("SF Pro Text", 9, "bold"), fg=COLOUR_RUNNING, bg=COLOUR_PANEL,
             anchor="w"
         )
         self._quest_type_lbl.pack(fill="x")
 
         self._quest_title_lbl = tk.Label(
             qcard, text="",
-            font=("SF Pro Text", 10), fg=COLOUR_TEXT, bg=COLOUR_PANEL,
-            anchor="w", wraplength=390
+            font=("SF Pro Text", 9), fg=COLOUR_TEXT, bg=COLOUR_PANEL,
+            anchor="w", wraplength=320
         )
         self._quest_title_lbl.pack(fill="x")
 
         self._quest_target_lbl = tk.Label(
             qcard, text="",
-            font=("SF Pro Text", 9, "italic"), fg="#a8d8ea", bg=COLOUR_PANEL,
-            anchor="w", wraplength=390
+            font=("SF Pro Text", 8, "italic"), fg="#a8d8ea", bg=COLOUR_PANEL,
+            anchor="w", wraplength=320
         )
         self._quest_target_lbl.pack(fill="x")
 
         self._quest_dist_lbl = tk.Label(
             qcard, text="",
-            font=("SF Pro Text", 9), fg=COLOUR_DIM, bg=COLOUR_PANEL,
+            font=("SF Pro Text", 8), fg=COLOUR_DIM, bg=COLOUR_PANEL,
             anchor="w"
         )
         self._quest_dist_lbl.pack(fill="x")
 
+        # ── Task checklist ────────────────────────────────────────────────
+        tcard = tk.Frame(root, bg=COLOUR_PANEL, padx=10, pady=6)
+        tcard.pack(fill="x", padx=8, pady=(4, 0))
+
+        tk.Label(tcard, text="TASKS", font=("SF Pro Text", 8, "bold"),
+                 fg=COLOUR_DIM, bg=COLOUR_PANEL, anchor="w").pack(fill="x")
+
+        # Two-column grid of checkboxes
+        grid = tk.Frame(tcard, bg=COLOUR_PANEL)
+        grid.pack(fill="x", pady=(2, 0))
+
+        self._task_vars: dict[str, tk.BooleanVar] = {}
+        for idx, (name, label, default) in enumerate(AUTOMATION_TASKS):
+            var = tk.BooleanVar(value=default)
+            self._task_vars[name] = var
+            row, col = divmod(idx, 2)
+            cb = tk.Checkbutton(
+                grid, text=label, variable=var,
+                bg=COLOUR_PANEL, fg=COLOUR_TEXT, selectcolor=COLOUR_BG,
+                activebackground=COLOUR_PANEL, activeforeground=COLOUR_TEXT,
+                font=("SF Pro Text", 9), anchor="w",
+            )
+            cb.grid(row=row, column=col, sticky="w", padx=(0, 10))
+
         # ── Stats row ─────────────────────────────────────────────────────
-        stats = tk.Frame(root, bg=COLOUR_PANEL, padx=14, pady=8)
-        stats.pack(fill="x", padx=10, pady=(6, 0))
+        stats = tk.Frame(root, bg=COLOUR_PANEL, padx=10, pady=6)
+        stats.pack(fill="x", padx=8, pady=(4, 0))
 
         def stat_block(parent, title):
             f = tk.Frame(parent, bg=COLOUR_PANEL)
             f.pack(side="left", expand=True)
-            tk.Label(f, text=title, font=("SF Pro Text", 8, "bold"),
+            tk.Label(f, text=title, font=("SF Pro Text", 7, "bold"),
                      fg=COLOUR_DIM, bg=COLOUR_PANEL).pack()
-            val = tk.Label(f, text="0", font=("SF Pro Text", 18, "bold"),
+            val = tk.Label(f, text="0", font=("SF Pro Text", 14, "bold"),
                            fg=COLOUR_TEXT, bg=COLOUR_PANEL)
             val.pack()
             return val
@@ -234,17 +278,17 @@ class Dashboard:
         self._elapsed_val = stat_block(stats, "ELAPSED")
 
         # ── Activity log ──────────────────────────────────────────────────
-        log_frame = tk.Frame(root, bg=COLOUR_BG, padx=10, pady=6)
-        log_frame.pack(fill="both", expand=True, pady=(8, 0))
-        tk.Label(log_frame, text="ACTIVITY LOG", font=("SF Pro Text", 9, "bold"),
+        log_frame = tk.Frame(root, bg=COLOUR_BG, padx=8, pady=4)
+        log_frame.pack(fill="both", expand=True, pady=(4, 0))
+        tk.Label(log_frame, text="ACTIVITY LOG", font=("SF Pro Text", 8, "bold"),
                  fg=COLOUR_DIM, bg=COLOUR_BG, anchor="w").pack(fill="x")
 
         txt_frame = tk.Frame(log_frame, bg=COLOUR_PANEL)
-        txt_frame.pack(fill="both", expand=True, pady=(4, 0))
+        txt_frame.pack(fill="both", expand=True, pady=(2, 0))
         self._log_box = tk.Text(
-            txt_frame, height=9, bg=COLOUR_PANEL, fg=COLOUR_TEXT,
-            font=("Menlo", 9), relief="flat", state="disabled",
-            wrap="word", padx=6, pady=4
+            txt_frame, height=6, bg=COLOUR_PANEL, fg=COLOUR_TEXT,
+            font=("Menlo", 8), relief="flat", state="disabled",
+            wrap="word", padx=4, pady=3
         )
         sb = tk.Scrollbar(txt_frame, command=self._log_box.yview)
         self._log_box.configure(yscrollcommand=sb.set)
@@ -252,11 +296,11 @@ class Dashboard:
         self._log_box.pack(side="left", fill="both", expand=True)
 
         # ── Button row ────────────────────────────────────────────────────
-        btn_frame = tk.Frame(root, bg=COLOUR_BG, padx=10, pady=8)
+        btn_frame = tk.Frame(root, bg=COLOUR_BG, padx=8, pady=6)
         btn_frame.pack(fill="x")
 
-        btn_cfg = dict(font=("SF Pro Text", 12, "bold"), relief="flat",
-                       padx=12, pady=7, cursor="hand2", bd=0)
+        btn_cfg = dict(font=("SF Pro Text", 11, "bold"), relief="flat",
+                       padx=10, pady=5, cursor="hand2", bd=0)
 
         # Start button (visible initially)
         self._start_btn = tk.Button(
@@ -336,6 +380,12 @@ class Dashboard:
     # ── Refresh (main thread, called by root.after) ──────────────────────────
 
     def _refresh(self) -> None:
+        # Sync checkbox states to the thread-safe dict
+        if hasattr(self, '_task_vars'):
+            with self._lock:
+                for name, var in self._task_vars.items():
+                    self._task_states[name] = var.get()
+
         with self._lock:
             status      = self._status
             status_text = self._status_text

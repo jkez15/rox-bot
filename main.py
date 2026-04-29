@@ -88,11 +88,30 @@ def automation_loop(dash: Dashboard) -> None:
                     dash.set_action(msg)
                     dash.log(msg)
 
-                try:
-                    quest_info, clicked = do_quest_scan(status_cb=_status)
-                except Exception as exc:
-                    dash.log(f"⚠️  Error in quest scan: {exc}")
-                    quest_info, clicked = None, False
+                quest_info = None
+                clicked    = False
+
+                # ── Quest automation (gated by checklist) ─────────────────
+                if dash.is_task_enabled("quests"):
+                    try:
+                        quest_info, clicked = do_quest_scan(status_cb=_status)
+                    except Exception as exc:
+                        dash.log(f"⚠️  Error in quest scan: {exc}")
+                else:
+                    dash.set_action("Quests disabled — skipping")
+
+                # ── Future tasks — add implementations here ───────────────
+                # if dash.is_task_enabled("daily_rewards"):
+                #     do_daily_rewards(status_cb=_status)
+                #
+                # if dash.is_task_enabled("auto_potion"):
+                #     do_auto_potion(status_cb=_status)
+                #
+                # if dash.is_task_enabled("party_accept"):
+                #     do_party_accept(status_cb=_status)
+                #
+                # if dash.is_task_enabled("farming"):
+                #     do_farming(status_cb=_status)
 
                 # Push quest info to dashboard
                 dash.set_quest(quest_info)
