@@ -72,6 +72,10 @@ INTERACTION_PATTERNS = [
 # ABOVE the dialog zone (cy < DIALOG_TEXT_Y_MIN) so they don't collide with
 # dialog buttons or quest-row text.
 ACTION_BUTTON_PATTERNS: list[str] = [
+    # Show / present item quests  ← e.g. "Show the boy Veronica's Photograph"
+    r"\bShow\b",
+    r"\bPresent\b",
+    r"\bDisplay\b",
     # Photography / camera quests
     r"\bPhotograph\b",
     r"\bPhoto\b",
@@ -96,12 +100,14 @@ ACTION_BUTTON_PATTERNS: list[str] = [
     r"\bPull\b",
     r"\bPlace\b",
     r"\bDrop\b",
+    r"\bInvestigate\b",
+    r"\bInspect\b",
+    r"\bCheck\b",
     # Combat / dungeon
     r"\bAttack\b",
     r"\bFight\b",
     r"\bEnter\b",
     r"\bChallenge\b",
-    r"\bStart\b",
     r"\bBegin\b",
     # Delivery / quest hand-in
     r"\bDeliver\b",
@@ -109,6 +115,7 @@ ACTION_BUTTON_PATTERNS: list[str] = [
     r"\bHand\s*over\b",
     r"\bSubmit\b",
     r"\bTurn\s*in\b",
+    r"\bReport\b",
     # Miscellaneous quest actions
     r"\bRepair\b",
     r"\bCraft\b",
@@ -126,6 +133,10 @@ ACTION_BUTTON_PATTERNS: list[str] = [
     r"\bComplete\b",
     r"\bClaim\b",
     r"\bReceive\b",
+    r"\bExchange\b",
+    r"\bTrade\b",
+    r"\bBuy\b",
+    r"\bSell\b",
 ]
 
 MIN_CONF_ACTION = 0.30   # action buttons may be styled / small
@@ -154,9 +165,26 @@ DIALOG_CHOICE_PATTERNS = [
 DIALOG_CHOICE_X_MIN = 650   # logical pixels
 
 # NPC dialog is considered open when speech text appears near the bottom.
-DIALOG_TEXT_Y_MIN = 600   # logical pixels
+# Y range is bounded to exclude world chat (y > DIALOG_TEXT_Y_MAX).
+DIALOG_TEXT_Y_MIN = 620   # logical pixels — above world chat
+DIALOG_TEXT_Y_MAX = 760   # logical pixels — below this is world chat / UI bar
 
-# Centre of the game world — used as spam-click fallback to advance dialog.
+# NPC name patterns — a dialog is only treated as open if an NPC name label
+# is detected in the speech zone.  This prevents world-chat text from
+# falsely triggering dialog handling.
+NPC_NAME_PATTERNS = [
+    r"\bBoy\b",
+    r"\bGirl\b",
+    r"\bGuard\b",
+    r"\bMerchant\b",
+    r"\bVendor\b",
+    r"\bKnight\b",
+    r"\bSoldier\b",
+    r"\bWizard\b",
+    r"\bPriest\b",
+    r"\bHunter\b",
+    r"\bNPC\b",
+]
 # Approximately mid-screen excluding the UI panels.
 DIALOG_SPAM_X = 525   # logical pixels (centre x)
 DIALOG_SPAM_Y = 420   # logical pixels (centre y)
@@ -180,38 +208,43 @@ def _extract_target(text: str) -> str | None:
 
 def _find_dialog_button(regions, bounds_w: int = 1051):
     """
-    Determine what to do when an NPC dialog is open.
+    Determine what to do when an NPC conversation dialog is open.
 
-    Returns (cx, cy, label, action) where action is one of:
-      'skip'   — Skip button found → click it
-      'choice' — selectable option on right side → click first found
-      'spam'   — no specific button; caller should spam-click centre
-    Returns None if no dialog appears to be open.
+    A dialog is active ONLY when at least one explicit dialog button
+    (Skip, Inquire, Next, etc.) is found outside the sidebar.
+    This avoids world-chat text at the bottom falsely triggering dialog mode.
 
-    Dialog is detected when NPC speech text appears near the bottom of
-    the screen (cy > DIALOG_TEXT_Y_MIN).
+    Returns (cx, cy, label, action) or None.
     """
-    has_speech = any(
-        r.cy > DIALOG_TEXT_Y_MIN and r.cx > QUEST_PANEL_X_MAX
-        for r in regions
-        if r.conf >= MIN_CONF_DIALOG
-    )
-    if not has_speech:
-        return None
-
-    # 1. Skip — highest preference, always click it if present
+    # Require an explicit button — don't rely on speech text presence alone.
+    # 1. Skip — highest preference
     skip_r = find_text(regions, SKIP_PATTERN, min_conf=MIN_CONF_DIALOG)
     if skip_r and skip_r.cx > QUEST_PANEL_X_MAX:
         return skip_r.cx, skip_r.cy, skip_r.text, "skip"
 
-    # 2. Right-side choice buttons
+    # 2. Right-side choice buttons (cx > DIALOG_CHOICE_X_MIN)
     for pattern in DIALOG_CHOICE_PATTERNS:
         r = find_text(regions, pattern, min_conf=MIN_CONF_DIALOG)
         if r and r.cx > DIALOG_CHOICE_X_MIN:
             return r.cx, r.cy, r.text, "choice"
 
-    # 3. Fallback — spam-click centre of game world to advance
-    return DIALOG_SPAM_X, DIALOG_SPAM_Y, "screen", "spam"
+    # 3. Spam-click fallback — only when actual NPC speech is present.
+    # Require multi-word text in the speech zone that doesn't look like
+    # recruit/party-chat (which always contains "Lv." level numbers).
+    has_npc_speech = any(
+        DIALOG_TEXT_Y_MIN < r.cy < DIALOG_TEXT_Y_MAX
+        and r.cx > QUEST_PANEL_X_MAX
+        and r.conf >= 0.60
+        and len(r.text.split()) >= 4        # real NPC speech is a sentence
+        and "Lv." not in r.text             # exclude party/recruit chat
+        and "Recruit" not in r.text
+        and "World" not in r.text
+        for r in regions
+    )
+    if has_npc_speech:
+        return DIALOG_SPAM_X, DIALOG_SPAM_Y, "screen", "spam"
+
+    return None
 
 
 # How many pixels above the "Examine" / "Inspect" text the icon button sits.
