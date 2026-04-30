@@ -1,0 +1,587 @@
+# All Lua TextAsset script names found in this bundle
+
+data_CameraFilter_CameraFilter
+    local table= {
+
+data_Capoo_CapooKv
+    return
+
+data_Capoo_CapooMysteryBox
+    local table = {
+
+data_Capoo_CapooShow
+    local table = {
+
+data_CarrierInfo
+    
+
+data_Carrier_Carrier
+    local table = {
+
+data_Carrier_CarrierButton
+    local table = {
+
+data_Carrier_CarrierButtonDisplay
+    local table = {
+
+data_Carrier_Page
+    local table = {
+
+data_Carrier_ShootDisplay
+    local table = {
+
+data_ChangeJobInstance_ChangeJobInstance
+    local table = {
+
+data_Channel_Channel
+    local table = {
+
+data_ChessGameGrid_ChessGameGrid
+    local table = {
+
+data_ChessGameType_ChessGameType
+    local table = {
+
+data_ChessGame_ChessGame
+    local table= {
+
+data_Climb_Climb
+    local table = {
+
+data_ClothOffsetInfo
+    
+
+data_ClothOffset_ClothOffset
+    local table= {
+
+data_CollectAction_CollectAction
+    local table= {
+
+data_ComeBackLevel_ComeBackLevel
+    local table = {
+
+data_CommonSkillInfo
+    
+
+data_ComplexActionInfo
+    
+
+data_Condition
+    local table = {
+
+data_ConfirmCheckBox_ConfirmCheckBox
+    local table = {
+
+data_Cook_Cook
+    local table = {
+
+data_CrossRegionPVP_CrossRegionPVP
+    local table = {
+
+data_CrossRegionPVP_CrossRegionPVPActivity
+    local table = {
+
+data_CurrencyField
+    local table = {}
+
+data_CurrencyIcon
+    local table = {
+
+data_CustomRoom_CustomRoomGoal
+    local table = {
+
+data_CustomRoom_CustomRoomKV
+    return
+
+data_DemonSlayer_DemonSlayerBPCommand
+    local table = {
+
+data_DemonSlayer_DemonSlayerBattlePass
+    local table = {
+
+data_DemonSlayer_DemonSlayerBloodSecret
+    local table = {
+
+data_DemonSlayer_DemonSlayerConfig
+    return
+
+data_DemonSlayer_DemonSlayerTreasure
+    local table = {
+
+data_DepositoryConfig_DepositoryConfig
+    local table = {
+
+data_DialogueBubbleInfo
+    
+
+data_Digimon_DigimonDuelConfig
+    return
+
+data_Digimon_DigimonGachaConfig
+    return
+
+data_Digimon_DigimonGachaDrop
+    local table = {
+
+data_Digimon_DigimonKV
+    return
+
+data_Digimon_DigimonPioneerConfig
+    return
+
+data_DpsTestMonster
+    return
+
+data_DrunkenParty
+    local table = {
+
+data_DuckyoFriends_DuckyoFriendsKv
+    return
+
+data_DuckyoFriends_DuckyoFriendsMysteryBox
+    local table = {
+
+data_DuckyoFriends_DuckyoFriendsShow
+    local table = {
+
+data_DynamicActivityTicket_DynamicActivityTicket
+    local table = {
+
+data_DynamicActivity_AnniversaryCommand
+    local table = {
+
+data_DynamicActivity_DynamicActivityMain
+    local table = {
+
+data_DynamicActivity_DynamicActivityQuest
+    local table = {
+
+data_DynamicActivity_DynamicBattlePass
+    local table = {
+
+data_DynamicActivity_DynamicBattlePassQuest
+    local table = {
+
+data_DynamicActivity_DynamicBattlePassReward
+    local table = {
+
+data_DynamicActivity_DynamicBattlePassV2
+    local table = {
+
+data_DynamicActivity_DynamicDiscountGifts
+    local table= {
+
+data_DynamicActivity_DynamicPointAward
+    local table = {
+
+data_DynamicActivity_DynamicPointIntervalAward
+    local table = {
+
+data_DynamicActivity_RamadanQuest
+    local table = {
+
+data_DynamicNPCInfo
+    
+
+data_NPCInfo
+    
+
+data_NPCIntimacyItem_NPCIntimacyItem
+    local table = {
+
+data_NPCIntimacyTaskRandom_NPCIntimacyTaskRandom
+    local table= {
+
+data_NewComeBack_NewComeBack
+    return
+
+data_NewComeBack_NewComeBackBattlePass
+    local table = {
+
+data_NewComeBack_NewComeBackPointAward
+    local table = {
+
+data_NewComeBack_NewComeBackQuest
+    local table = {
+
+data_NineTalesActivity_NineTalesActivity
+    local table = {
+
+data_NotchConfig
+    return
+
+data_NpcAct_NpcAct
+    local table = {
+
+data_NpcFriend_NpcFriend
+    local table = {
+
+data_NpcGenerator_NpcGenerator
+    local table= {
+
+data_NpcLook_NpcLook
+    local table = {
+
+data_PVP_PVP
+    local table= {
+
+data_PatrolNPCInfo
+    
+
+data_Pendant
+    local table = {
+
+data_PendantInfo
+    
+
+data_Personalize_Personalize
+    local table = {
+
+data_PetDecorationInfo
+    
+
+data_PetDecorationSetInfo
+    
+
+data_PetInfo
+    
+
+data_PhoneBindConfig
+    local table= {
+
+data_PhotoRegion_PhotoRegion
+    local table = {
+
+data_Photo_PhotoFrame
+    local table= {
+
+data_PlayerModel_PlayerModel
+    local table= {
+
+data_PrefixInfo
+    
+
+data_Prop
+    local table = {
+
+data_PropCalculation
+    local table = {
+
+data_PropID
+    local table = {
+
+data_PunchHoleCost
+    local table = {
+
+data_PurgatorialShopLevel
+    local table= {
+
+data_PurgatorialSoulBack
+    local table= {
+
+data_PvpHunter10_PvpHunter10
+    local table= {
+
+data_PvpHunter_MvpArenaMonsterDrop
+    local table = {
+
+data_PvpHunter_MvpArenaNpcDrop
+    local table = {
+
+data_PvpHunter_PvpHunter
+    local table = {
+
+data_PvpHunter_PvpHunter10
+    local table = {
+
+data_PvpHunter_PvpHunterArmorLevel
+    local table = {
+
+data_PvpHunter_PvpHunterSet
+    local table = {
+
+data_UltraManActivity_UltraManBattlePassQuest
+    local table = {
+
+data_UltraManActivity_UltraManBattlePassReward
+    local table = {
+
+data_UltraManActivity_UltraManGachaConfig
+    return
+
+data_UltraManActivity_UltraManGachaDrop
+    local table = {
+
+data_UltraManActivity_UltraManInvadeConfig
+    return
+
+data_UltraManActivity_UltraManInvadeDailyReward
+    local table = {
+
+data_UltraManActivity_UltraManInvadeRankReward
+    local table = {
+
+data_UltraManActivity_UltraManQuestion
+    local table = {
+
+data_UnlockShow
+    local table = {
+
+data_ZoneGvGConfig_ZoneGvGConfig
+    return
+
+data_college_Academy
+    return
+
+data_college_CollegeCommodity
+    local table= {
+
+data_college_CollegeEvent
+    local table= {
+
+data_college_CollegeStore
+    local table = {
+
+data_college_CollegeTasks
+    local table= {
+
+data_college_GradeTasks
+    local table= {
+
+data_college_RecruitLabel
+    local table= {
+
+data_college_TeacherTasks
+    local table= {
+
+data_crypt_rsa_public_key
+    -----BEGIN PUBLIC KEY-----
+
+data_data
+    local table = {
+
+data_dialogue_Aside
+    local table = {
+
+data_dialogue_DialogueBubble
+    local table = {
+
+data_dialogue_DialoguePackage
+    local __rt_1 = {
+
+data_dialogue_TaskQuestion
+    local table = {
+
+data_dropV2_DropCollection
+    local __rt_1 = {
+
+data_dropV2_DropLimit
+    local table = {
+
+data_dropV2_DropV2
+    local __rt_1 = {
+
+data_drop_ConditionDrop
+    local table = {
+
+data_drop_SPDrop
+    local table = {}
+
+data_drop_TimeLimitedFarmActivityDrop
+    local table= {
+
+data_dynamicActivities_ChildrenActivities
+    local table = {
+
+data_dynamicActivities_DynamicActivityType1
+    local table= {
+
+data_dynamicActivities_ShootActivityBase
+    local table = {
+
+data_dynamicActivities_TimeLimitedFarmActivity
+    local table= {
+
+data_dynamicActivities_WorldKvmPreReward
+    local table= {
+
+data_dynamicActivities_WorldKvmQualificationNum
+    local table = {
+
+data_npc_CarrierNPC
+    local table = {
+
+data_npc_CollectNPC
+    local table = {
+
+data_npc_ConditionDialogueList
+    local table = {
+
+data_npc_DynamicNPC
+    local __rt_1 = {
+
+data_npc_GvgBattleFieldNpc
+    local table = {
+
+data_npc_NPC
+    local table = {
+
+data_npc_NPCIntimacy
+    local table = {
+
+data_npc_NPCIntimacyFunction
+    local table= {
+
+data_npc_PatrolNPC
+    local table = {
+
+data_npc_SceneCollectNPC
+    local table = {
+
+data_npc_SceneDynamicNPC
+    local __rt_1 = {
+
+data_npc_SceneNPC
+    local table = {
+
+data_npc_TwoCampSnatchNpc
+    local table = {
+
+data_npc_complexAction
+    local table= {
+
+data_pet_Pet
+    local table = {
+
+data_pet_PetAbandonment
+    local table= {
+
+data_pet_PetAddPropSkill
+    local table= {
+
+data_pet_PetAffix
+    local table = {
+
+data_pet_PetBaseAttr
+    local table = {
+
+data_pet_PetCatchingRate
+    local table= {
+
+data_pet_PetCatchingRateV2
+    local table = {
+
+data_pet_PetCharacter
+    local table = {
+
+data_pet_PetChat
+    local table = {
+
+data_pet_PetColorMatch
+    local table = {
+
+data_pet_PetDecoration
+    local table = {
+
+data_pet_PetDecorationSet
+    local table = {
+
+data_pet_PetEvolution
+    local table = {
+
+data_pet_PetEvolutionV2
+    local table = {
+
+data_pet_PetFriendship
+    local table= {
+
+data_pet_PetInheritance
+    local table = {
+
+data_pet_PetInitEndowment
+    local table= {
+
+data_pet_PetInitEndowmentV2
+    local table = {
+
+data_pet_PetIntimacy
+    local table = {
+
+data_pet_PetIntimacyItem
+    local table = {
+
+data_pet_PetIntimacyReturn
+    local table = {
+
+data_pet_PetIntimacyValue
+    local table= {
+
+data_pet_PetLaBa
+    local table = {
+
+data_pet_PetPotential
+    local table = {
+
+data_pet_PetPotentiality
+    local table = {
+
+data_pet_PetPotentialityRedistribute
+    local table = {
+
+data_pet_PetQuality
+    local table = {
+
+data_pet_PetSkill
+    local table = {
+
+data_pet_PetSkillGroup
+    local table = {
+
+data_pet_PetSkillReturn
+    local table = {
+
+data_pet_PetSkillTraining
+    local table = {
+
+data_pet_PetSkillUnlock
+    local table = {
+
+data_pet_PetStar
+    local table = {
+
+data_pet_PetStarRange
+    local table = {
+
+data_pet_PetStarReturn
+    local table = {
+
+data_pettask_PetTask
+    local table = {
+
+data_pettask_PetTaskAction
+    local table = {
+
+data_pettask_PetTaskBg
+    local table = {
+
+data_pettask_PetTaskIntelligence
+    local table = {
+
+data_pettask_damagePropertyRestrain
+    local table = {
+
+data_platforms_bytedance_Recharge
+    local table = {
+
+data_platforms_dream_Recharge
+    local table = {
+
+data_platforms_toutiao_Recharge
+    local table = {
+
+data_platforms_unicorn_Recharge
+    local table = {
+
+data_proto
+    
+
