@@ -1,184 +1,103 @@
 """
-log_monitor.py — Real-time Unity Player.log monitor for the RöX game.
+log_monitor.py — OCR-driven game state tracker for the RöX automation bot.
 
-The game writes debug output to its Unity Player.log file. By tailing this
-file, we can observe game events (quest updates, scene transitions, NPC
-interactions, errors) without any code injection.
+Background
+----------
+RöX (production iOS Catalyst build) does NOT write a Unity Player.log.
+The game's only log files are proprietary ByteDance `.alog` files stored at:
+  ~/Library/Containers/com.play.rosea/Data/Library/alog/default/ready/
+These are fully encrypted/compressed binary blobs — not readable.
 
-Architecture
-------------
-  LogMonitor runs on a dedicated daemon thread.  It tails the log file,
-  parses each new line, and pushes recognised events into a thread-safe
-  deque that the automation loop can poll.
+Strategy
+--------
+Instead of tailing a log file, we derive game state from the OCR regions
+that the automation loop already captures each scan cycle.  After every call
+to `read_window()`, pass the result to `tracker.update(regions)`.
+The tracker extracts:
 
-Typical Unity log locations (macOS):
-  ~/Library/Logs/Unity/Player.log
-  ~/Library/Containers/com.play.rosea/Data/Library/Logs/Unity/Player.log
-  ~/Library/Containers/com.play.rosea/Data/Documents/Player.log
+  • Pathfinding state                 ("Distance to target: N m" text)
+  • Distance to target                (exact metres, 0 = arrived)
+  • Dialog open/close                 (Skip/Next/Close buttons visible)
+  • NPC interaction available         (Examine/Inspect/Talk label visible)
+  • Dungeon mode                      (Leave button in top HUD)
+  • Active quest title                ([Main] row in quest sidebar)
+
+All state is updated atomically under a lock so the Tkinter thread can
+safely read it via the properties.
 
 Usage
 -----
-    from log_monitor import LogMonitor, GameEvent
+    from log_monitor import tracker, GameEvent
 
-    monitor = LogMonitor()
-    monitor.start()
+    # In the automation loop (worker thread), after OCR:
+    regions = read_window(screenshot)
+    events = tracker.update(regions)
+    for e in events:
+        print(e.kind, e.data)
 
-    # In the automation loop:
-    while True:
-        for event in monitor.drain_events():
-            if event.kind == "quest_complete":
-                ...
-            elif event.kind == "scene_change":
-                ...
-        # or check latest state:
-        if monitor.current_scene:
-            ...
+    # From any thread — read accumulated state:
+    if tracker.is_pathfinding:
+        pass
+    if tracker.distance_to_target == 0:
+        pass
 """
 
 from __future__ import annotations
 
-import os
 import re
-import time
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from ocr import TextRegion
 
-# ── Possible log file locations (checked in order) ───────────────────────────
-_LOG_PATHS = [
-    os.path.expanduser(
-        "~/Library/Containers/com.play.rosea/Data/Library/Logs/Unity/Player.log"
-    ),
-    os.path.expanduser("~/Library/Logs/Unity/Player.log"),
-    os.path.expanduser(
-        "~/Library/Containers/com.play.rosea/Data/Documents/Player.log"
-    ),
-]
 
 MAX_EVENTS = 200
 
+# OCR text patterns
+_DIST_PATTERN    = re.compile(r'[Dd]istance\s+to\s+target[:\s]+(\d+)\s*m')
+_DUNGEON_LEAVE   = re.compile(r'\bLeave\b', re.IGNORECASE)
+_DIALOG_BUTTONS  = re.compile(r'\b(?:Skip|Next|Close|Inquire|Continue|OK)\b',
+                               re.IGNORECASE)
+_EXAMINE_LABEL   = re.compile(r'\b(?:Examine|Inspect|Talk|Interact)\b',
+                               re.IGNORECASE)
+_QUEST_MAIN      = re.compile(r'\[Main\]')
 
-# ── Event types ───────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class GameEvent:
-    """A structured event parsed from a Unity log line."""
-    kind: str           # e.g. "scene_change", "quest_update", "npc_interact"
-    data: dict          # event-specific payload
-    raw_line: str       # original log line
-    timestamp: float    # time.time() when parsed
+    """A structured state-change event derived from OCR regions."""
+    kind: str           # e.g. "pathfinding_started", "arrived", "dialog_open"
+    data: dict
+    timestamp: float = field(default_factory=time.time)
+
+    def __str__(self) -> str:
+        return f"[{self.kind}] {self.data}"
 
 
-# ── Log line patterns ─────────────────────────────────────────────────────────
-# These patterns are educated guesses based on Unity/HybridCLR conventions
-# and the C# Dream.* namespace found in Assembly-CSharp.dll.  They will be
-# refined once the live machine confirms actual log output.
-
-_PATTERNS: list[tuple[str, re.Pattern, list[str]]] = [
-    # Scene transitions
-    ("scene_change", re.compile(
-        r'(?:LoadScene|ChangeScene|EnterScene|OnSceneLoaded)\s*[:\(]\s*(\d+)',
-        re.IGNORECASE
-    ), ["scene_id"]),
-
-    # Quest / task updates
-    ("quest_update", re.compile(
-        r'(?:TaskUpdate|QuestUpdate|TaskComplete|QuestComplete|AcceptTask'
-        r'|SubmitTask|TaskProgress)\s*[:\(]\s*(\d+)',
-        re.IGNORECASE
-    ), ["task_id"]),
-
-    # Quest completion
-    ("quest_complete", re.compile(
-        r'(?:TaskComplete|QuestComplete|FinishTask)\s*[:\(]\s*(\d+)',
-        re.IGNORECASE
-    ), ["task_id"]),
-
-    # NPC interaction
-    ("npc_interact", re.compile(
-        r'(?:NPCInteract|TalkToNPC|NPCClick|OpenNPCDialog)\s*[:\(]\s*(\d+)',
-        re.IGNORECASE
-    ), ["npc_id"]),
-
-    # Pathfinding / navigation
-    ("pathfinding_start", re.compile(
-        r'(?:StartPathfinding|AutoPathing|MoveToTarget|NavigateTo)\s*[:\(]\s*([\d.,-]+)',
-        re.IGNORECASE
-    ), ["target"]),
-
-    ("pathfinding_end", re.compile(
-        r'(?:PathfindingComplete|ReachTarget|ArrivedAt|StopPathing)',
-        re.IGNORECASE
-    ), []),
-
-    # Player position (if logged)
-    ("player_pos", re.compile(
-        r'(?:PlayerPos|RolePos|Position)\s*[:\(]\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)',
-        re.IGNORECASE
-    ), ["x", "y", "z"]),
-
-    # Dialog events
-    ("dialog_open", re.compile(
-        r'(?:OpenDialogue|ShowDialogue|DialogueStart)\s*[:\(]\s*(\d+)',
-        re.IGNORECASE
-    ), ["dialogue_id"]),
-
-    ("dialog_close", re.compile(
-        r'(?:CloseDialogue|DialogueEnd|HideDialogue)',
-        re.IGNORECASE
-    ), []),
-
-    # Errors / warnings (always useful for debugging)
-    ("unity_error", re.compile(
-        r'^(?:Error|Exception|NullReferenceException|LuaException)',
-        re.IGNORECASE
-    ), []),
-
-    # HP/SP changes
-    ("hp_change", re.compile(
-        r'(?:HPChange|DamageReceived|HealReceived)\s*[:\(]\s*([\d.-]+)',
-        re.IGNORECASE
-    ), ["value"]),
-
-    # Item pickup
-    ("item_pickup", re.compile(
-        r'(?:PickupItem|GetItem|AddItem)\s*[:\(]\s*(\d+)\s*[,x]\s*(\d+)',
-        re.IGNORECASE
-    ), ["item_id", "count"]),
-]
-
-
-class LogMonitor:
+class GameStateTracker:
     """
-    Tails the Unity Player.log and emits GameEvent objects.
+    Derives and tracks game state from OCR scan results.
 
-    Thread-safe: start() spawns a daemon thread; drain_events() is safe
-    to call from any thread.
+    All public properties are thread-safe.
+    Call update(regions) from the worker thread after every read_window().
     """
 
     def __init__(self) -> None:
-        self._events: deque[GameEvent] = deque(maxlen=MAX_EVENTS)
         self._lock = threading.Lock()
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
-        self._log_path: str | None = None
+        self._events: deque[GameEvent] = deque(maxlen=MAX_EVENTS)
 
-        # Accumulated state derived from events
-        self._current_scene: int | None = None
-        self._last_quest_id: int | None = None
         self._is_pathfinding: bool = False
+        self._distance_to_target: int | None = None
+        self._active_quest_title: str | None = None
+        self._dialog_open: bool = False
+        self._in_dungeon: bool = False
+        self._npc_nearby: bool = False
 
-    # ── Public API ────────────────────────────────────────────────────────
-
-    @property
-    def log_path(self) -> str | None:
-        return self._log_path
-
-    @property
-    def current_scene(self) -> int | None:
-        with self._lock:
-            return self._current_scene
+    # ── Public properties ─────────────────────────────────────────────────
 
     @property
     def is_pathfinding(self) -> bool:
@@ -186,31 +105,122 @@ class LogMonitor:
             return self._is_pathfinding
 
     @property
-    def last_quest_id(self) -> int | None:
+    def distance_to_target(self) -> int | None:
+        """Metres to current navigation target, or None if not pathfinding."""
         with self._lock:
-            return self._last_quest_id
+            return self._distance_to_target
 
-    def start(self) -> bool:
-        """Start the log-tail thread.  Returns True if the log file was found."""
-        self._log_path = self._find_log()
-        if self._log_path is None:
-            print("[LogMonitor] No Unity Player.log found — monitoring disabled")
-            return False
+    @property
+    def active_quest_title(self) -> str | None:
+        with self._lock:
+            return self._active_quest_title
 
-        print(f"[LogMonitor] Tailing {self._log_path}")
-        self._stop.clear()
-        self._thread = threading.Thread(
-            target=self._tail_loop,
-            daemon=True,
-            name="log-monitor",
+    @property
+    def dialog_open(self) -> bool:
+        with self._lock:
+            return self._dialog_open
+
+    @property
+    def in_dungeon(self) -> bool:
+        with self._lock:
+            return self._in_dungeon
+
+    @property
+    def npc_nearby(self) -> bool:
+        """True when an Examine/Inspect/Talk button is visible."""
+        with self._lock:
+            return self._npc_nearby
+
+    # ── Core update method ────────────────────────────────────────────────
+
+    def update(self, regions: list) -> list[GameEvent]:
+        """
+        Parse a fresh list of OCR TextRegions and update internal state.
+        Returns a list of new GameEvents (state changes only).
+        Call this from the worker thread after every read_window().
+        """
+        all_text = " ".join(r.text for r in regions)
+        new_events: list[GameEvent] = []
+
+        # 1. Distance / pathfinding
+        dist_match = _DIST_PATTERN.search(all_text)
+        if dist_match:
+            dist = int(dist_match.group(1))
+            with self._lock:
+                prev_pf   = self._is_pathfinding
+                prev_dist = self._distance_to_target
+                self._is_pathfinding    = dist > 0
+                self._distance_to_target = dist
+                if not prev_pf and dist > 0:
+                    e = GameEvent("pathfinding_started", {"distance": dist})
+                    self._events.append(e); new_events.append(e)
+                if prev_dist and prev_dist > 0 and dist == 0:
+                    e = GameEvent("arrived", {"previous_distance": prev_dist})
+                    self._events.append(e); new_events.append(e)
+        else:
+            with self._lock:
+                if self._is_pathfinding:
+                    e = GameEvent("pathfinding_ended", {})
+                    self._events.append(e); new_events.append(e)
+                self._is_pathfinding    = False
+                self._distance_to_target = None
+
+        # 2. Dialog open/close
+        has_dialog = bool(_DIALOG_BUTTONS.search(all_text))
+        with self._lock:
+            was_open = self._dialog_open
+            self._dialog_open = has_dialog
+            if not was_open and has_dialog:
+                e = GameEvent("dialog_open", {})
+                self._events.append(e); new_events.append(e)
+            elif was_open and not has_dialog:
+                e = GameEvent("dialog_closed", {})
+                self._events.append(e); new_events.append(e)
+
+        # 3. NPC nearby (Examine/Talk button visible)
+        has_npc = bool(_EXAMINE_LABEL.search(all_text))
+        with self._lock:
+            was_npc = self._npc_nearby
+            self._npc_nearby = has_npc
+            if not was_npc and has_npc:
+                e = GameEvent("npc_in_range", {})
+                self._events.append(e); new_events.append(e)
+            elif was_npc and not has_npc:
+                e = GameEvent("npc_out_of_range", {})
+                self._events.append(e); new_events.append(e)
+
+        # 4. Dungeon detection (Leave button in top HUD area, y < 300)
+        in_dungeon = any(
+            _DUNGEON_LEAVE.search(r.text) and r.cy < 300
+            for r in regions
         )
-        self._thread.start()
-        return True
+        with self._lock:
+            was_dungeon = self._in_dungeon
+            self._in_dungeon = in_dungeon
+            if not was_dungeon and in_dungeon:
+                e = GameEvent("dungeon_entered", {})
+                self._events.append(e); new_events.append(e)
+            elif was_dungeon and not in_dungeon:
+                e = GameEvent("dungeon_exited", {})
+                self._events.append(e); new_events.append(e)
 
-    def stop(self) -> None:
-        self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=2)
+        # 5. Active quest title — first [Main] row in sidebar (x < 260)
+        quest_regions = [
+            r for r in regions
+            if _QUEST_MAIN.search(r.text) and r.cx < 260
+        ]
+        if quest_regions:
+            title = quest_regions[0].text.strip()
+            with self._lock:
+                if self._active_quest_title != title:
+                    old = self._active_quest_title
+                    self._active_quest_title = title
+                    e = GameEvent("quest_changed", {"old": old, "new": title})
+                    self._events.append(e); new_events.append(e)
+
+        return new_events
+
+    # ── Event queue API ───────────────────────────────────────────────────
 
     def drain_events(self) -> list[GameEvent]:
         """Return and clear all queued events (thread-safe)."""
@@ -224,96 +234,35 @@ class LogMonitor:
         with self._lock:
             return list(self._events)[-n:]
 
-    # ── Internal ──────────────────────────────────────────────────────────
+    def state_summary(self) -> dict:
+        """Return a snapshot of all tracked state (thread-safe)."""
+        with self._lock:
+            return {
+                "is_pathfinding":      self._is_pathfinding,
+                "distance_to_target":  self._distance_to_target,
+                "active_quest_title":  self._active_quest_title,
+                "dialog_open":         self._dialog_open,
+                "in_dungeon":          self._in_dungeon,
+                "npc_nearby":          self._npc_nearby,
+            }
 
-    @staticmethod
-    def _find_log() -> str | None:
-        for path in _LOG_PATHS:
-            if os.path.exists(path):
-                return path
-        return None
 
-    def _tail_loop(self) -> None:
-        """Continuously read new lines appended to the log file."""
-        path = self._log_path
-        if path is None:
-            return
-
-        try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
-                # Seek to end — we only care about NEW lines
-                f.seek(0, 2)
-
-                while not self._stop.is_set():
-                    line = f.readline()
-                    if line:
-                        line = line.rstrip("\n\r")
-                        if line:
-                            self._process_line(line)
-                    else:
-                        # No new data — sleep briefly
-                        time.sleep(0.1)
-        except FileNotFoundError:
-            print(f"[LogMonitor] Log file disappeared: {path}")
-
-    def _process_line(self, line: str) -> None:
-        """Match line against all known patterns and emit events."""
-        for kind, pattern, field_names in _PATTERNS:
-            m = pattern.search(line)
-            if m:
-                data: dict = {}
-                for i, name in enumerate(field_names):
-                    if i < len(m.groups()):
-                        data[name] = m.group(i + 1)
-
-                event = GameEvent(
-                    kind=kind,
-                    data=data,
-                    raw_line=line,
-                    timestamp=time.time(),
-                )
-
-                with self._lock:
-                    self._events.append(event)
-                    self._update_state(event)
-                break   # one event per line
-
-    def _update_state(self, event: GameEvent) -> None:
-        """Update accumulated state from a new event (called under lock)."""
-        if event.kind == "scene_change":
-            try:
-                self._current_scene = int(event.data.get("scene_id", 0))
-            except (ValueError, TypeError):
-                pass
-        elif event.kind == "quest_update":
-            try:
-                self._last_quest_id = int(event.data.get("task_id", 0))
-            except (ValueError, TypeError):
-                pass
-        elif event.kind == "pathfinding_start":
-            self._is_pathfinding = True
-        elif event.kind == "pathfinding_end":
-            self._is_pathfinding = False
+# ── Module-level singleton ────────────────────────────────────────────────────
+tracker = GameStateTracker()
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
-    monitor = LogMonitor()
-    if not monitor.start():
-        print("No log file found. Run this on the Mac with RöX installed.")
-        print(f"Searched: {_LOG_PATHS}")
-        import sys
-        sys.exit(1)
-
-    print(f"Monitoring: {monitor.log_path}")
-    print("Press Ctrl+C to stop.\n")
-    try:
-        while True:
-            events = monitor.drain_events()
-            for e in events:
-                print(f"  [{e.kind}] {e.data}  ← {e.raw_line[:120]}")
-            time.sleep(0.5)
-    except KeyboardInterrupt:
-        monitor.stop()
-        print("\nStopped.")
+    import sys
+    print("GameStateTracker — OCR-based state tracker (no log file)")
+    print()
+    print("RöX does NOT write a Unity Player.log.")
+    print("The .alog files at:")
+    print("  ~/Library/Containers/com.play.rosea/Data/Library/alog/default/ready/")
+    print("are ByteDance SDK binary blobs — not readable game events.")
+    print()
+    print("Usage:")
+    print("  from log_monitor import tracker")
+    print("  events = tracker.update(regions)   # call after every read_window()")
+    print("  print(tracker.state_summary())")
+    sys.exit(0)
