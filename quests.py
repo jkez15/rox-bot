@@ -241,18 +241,32 @@ def _find_dialog_button(regions, bounds_w: int = 1051):
 
     # 3. Spam-click fallback — only when actual NPC speech is present.
     # Require multi-word text in the speech zone that doesn't look like
-    # recruit/party-chat (which always contains "Lv." level numbers).
-    # Click on the detected speech text's position so the tap lands on the
-    # dialog box itself rather than a fixed screen centre.
+    # any chat or system message.
+    # Exclusion rules:
+    #   - conf < 0.70 (chat OCR is often lower-quality)
+    #   - contains "Lv." → party/recruit chat
+    #   - contains "Recruit" → recruitment message
+    #   - contains "World" → world channel label
+    #   - matches r'^\S+:' → "PlayerName: message" chat format
+    #   - contains "Tower", "Dungeon", "FRESH", "JOIN" → typical MMO announcements
+    CHAT_EXCLUSION = re.compile(
+        r'^\S+:'           # Username: message (party/world/team chat)
+        r'|\bLv\.'         # level number → recruit / party member text
+        r'|\bRecruit\b'
+        r'|\bWorld\b'
+        r'|Endless\s+Tower'
+        r'|\bFRESH\b'
+        r'|\bJOIN\b'
+        r'|\bDungeon\b',
+        re.IGNORECASE,
+    )
     speech_region = None
     for r in regions:
         if (
             DIALOG_TEXT_Y_MIN < r.cy < DIALOG_TEXT_Y_MAX
-            and r.conf >= 0.60
-            and len(r.text.split()) >= 4        # real NPC speech is a sentence
-            and "Lv." not in r.text             # exclude party/recruit chat
-            and "Recruit" not in r.text
-            and "World" not in r.text
+            and r.conf >= 0.70              # raised from 0.60 — chat OCR tends to be lower
+            and len(r.text.split()) >= 4    # real NPC speech is a sentence
+            and not CHAT_EXCLUSION.search(r.text)
         ):
             speech_region = r
             break
