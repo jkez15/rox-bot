@@ -7,9 +7,8 @@ Quest cycle (priority-ordered state machine per scan)
     Character is auto-walking.  Do nothing until 'Pathfinding' text clears.
 
   Step 1 — DIALOG ADVANCEMENT
-    Explicit dialog buttons (Skip / Inquire / Next / Continue / OK…) are
-    required to trigger this step.  NPC speech text alone is only used as a
-    spam-click fallback when no button is visible.
+    Requires an explicit button (Skip / Inquire / Next / Continue / OK…).
+    The chat/dialog zone (y > 620) is never clicked directly.
 
   Step 2 — INTERACTION CHECK
     'Examine' / 'Inspect' button in the game world → click the icon above it.
@@ -136,22 +135,6 @@ DIALOG_CHOICE_Y_MIN = HUD_TOP_Y_MAX       # 300 — never click Leave/Backpack
 
 MIN_CONF_DIALOG = 0.50
 
-# Chat / world-message exclusion for the NPC speech spam-click fallback.
-_CHAT_EXCLUSION = re.compile(
-    r'^\S+:'             # PlayerName: message
-    r'|\bLv\.'
-    r'|\bRecruit\b'
-    r'|\bWorld\b'
-    r'|\bGuild\b'
-    r'|Endless\s+Tower'
-    r'|\bFRESH\b'
-    r'|\bJOIN\b'
-    r'|\bDungeon\b'
-    r'|\bAFK\b'
-    r'|\bauto\s+join\b',
-    re.IGNORECASE,
-)
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -214,41 +197,48 @@ def _find_dialog_button(regions):
     """
     Returns (cx, cy, label, action) if a dialog interaction is needed, else None.
 
-    Priority:
-      1. Skip button (anywhere outside quest sidebar, below HUD)
-      2. Explicit choice button (below HUD, outside sidebar)
-      3. NPC speech spam-click (only clear multi-word sentence in dialog zone)
+    Only fires when an explicit button is present — Skip takes priority,
+    then any choice/advance button.  The chat/dialog zone (y > 620) is
+    NEVER clicked directly; NPC dialogs always surface a button.
     """
     # 1. Skip
     skip = find_text(regions, SKIP_PATTERN, min_conf=MIN_CONF_DIALOG)
     if skip and skip.cx > QUEST_PANEL_X_MAX and skip.cy > HUD_TOP_Y_MAX:
         return skip.cx, skip.cy, skip.text, "skip"
 
-    # 2. Choice buttons
+    # 2. Choice / advance buttons
     for pattern in DIALOG_CHOICE_PATTERNS:
         r = find_text(regions, pattern, min_conf=MIN_CONF_DIALOG)
         if r and r.cx > DIALOG_CHOICE_X_MIN and r.cy > DIALOG_CHOICE_Y_MIN:
             return r.cx, r.cy, r.text, "choice"
 
-    # 3. NPC speech spam-click fallback
-    for r in sorted(regions, key=lambda r: r.cy):
-        if (
-            DIALOG_TEXT_Y_MIN < r.cy < DIALOG_TEXT_Y_MAX
-            and r.conf >= 0.70
-            and len(r.text.split()) >= 4
-            and not _CHAT_EXCLUSION.search(r.text)
-        ):
-            return r.cx, r.cy, r.text[:40], "spam"
-
     return None
 
 
-def _find_interaction_button(regions):
-    """Return (cx, cy, label) for Examine/Inspect/Talk, or None."""
+def _find_interaction_button(regions, screenshot=None):
+    """
+    Return (cx, cy, label) for Examine/Inspect/Talk, or None.
+
+    The label can appear anywhere in the game world (including y < HUD_TOP_Y_MAX
+    when the NPC is near the top of the screen), so we only gate on:
+      - cx > QUEST_PANEL_X_MAX  (not in the sidebar)
+      - cy < GAME_WORLD_Y_MAX   (not in the chat/dialog zone)
+    """
     for pattern in INTERACTION_PATTERNS:
         r = find_text(regions, pattern, min_conf=MIN_CONF_BUTTON)
-        if r and r.cx > QUEST_PANEL_X_MAX and HUD_TOP_Y_MAX < r.cy < GAME_WORLD_Y_MAX:
+        if r and r.cx > QUEST_PANEL_X_MAX and r.cy < GAME_WORLD_Y_MAX:
             return r.cx, r.cy + INTERACTION_BUTTON_OFFSET_Y, r.text
+
+    # Template-matching fallback: catches the icon when OCR misses the label.
+    # Add templates/examine_icon.png (crop the yellow magnifying-glass) to enable.
+    if screenshot is not None:
+        from recognizer import find_template
+        match = find_template(screenshot, "examine_icon.png", threshold=0.75)
+        if match:
+            ix, iy, _ = match
+            if ix > QUEST_PANEL_X_MAX and iy < GAME_WORLD_Y_MAX:
+                return ix, iy, "Examine"
+
     return None
 
 
@@ -312,7 +302,7 @@ def do_quest_scan(
 
     if not dlg:
         # ── Step 2: Interaction button ────────────────────────────────────
-        btn = _find_interaction_button(regions)
+        btn = _find_interaction_button(regions, screenshot)
         if btn:
             bx, by, blabel = btn
             status_cb(f"🖱  Interact \"{blabel}\" at ({bx}, {by})")

@@ -25,7 +25,7 @@ DEBUG_PREVIEW = False
 # ─── Quest Automation ─────────────────────────────────────────────────────────
 
 # Seconds to wait between quest clicks (gives the character time to walk/run)
-QUEST_CLICK_INTERVAL = 8.0
+QUEST_CLICK_INTERVAL = 3.0
 
 # If template matching fails but the quest panel IS open, fall back to
 # clicking a hardcoded relative coordinate inside the panel.
