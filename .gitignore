@@ -32,3 +32,6 @@ templates/screenshot_*.png
 
 # Debug PNGs are KEPT (real annotated captures — useful reference for the other machine)
 # bundle_dumps/ is KEPT (extracted game data — useful reference for the other machine)
+
+# mitmproxy traffic captures (potentially contain auth tokens — never commit)
+rox_traffic/

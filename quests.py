@@ -37,6 +37,7 @@ from typing import Callable
 
 from capture import capture_window
 from ocr import read_window, find_text, find_all_text
+from log_monitor import tracker as _state_tracker
 from actions import click
 
 
@@ -279,6 +280,9 @@ def do_quest_scan(
     if not regions:
         status_cb("No text detected in window")
         return None, False
+
+    # Update game state tracker with fresh OCR results (thread-safe)
+    _state_tracker.update(regions)
 
     # ── Step 0: Pathfinding idle ──────────────────────────────────────────
     if _is_pathfinding(regions):
