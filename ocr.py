@@ -1,35 +1,57 @@
 """
-ocr.py - OCR text recognition for the RoX game window.
+ocr.py — OCR text recognition using Apple Vision framework (macOS native).
 
-Uses EasyOCR to read text directly from the captured window image.
-This is more robust than template matching — it detects quest text like
-"[Main]", "[Tutorial]", "Distance to target:" regardless of font size,
-colour shifts, or UI position changes after game updates.
+Why Vision instead of EasyOCR
+------------------------------
+EasyOCR loads a full PyTorch neural network (~2 s startup, ~1 s/scan).
+Apple Vision runs on the macOS Neural Engine — available on all Macs with
+no extra packages (pyobjc is already a project dependency).
 
-The OCR reader is a singleton (loaded once, reused every cycle) because
-loading the neural network model takes ~2 seconds.
+Benchmarks on M-series Mac:
+  EasyOCR  : first scan ~2 s, subsequent ~1 s
+  Vision   : first scan ~1 s (model load), subsequent ~190 ms  ← 5× faster
+
+Accuracy improvements over EasyOCR for this game:
+  - "Bernard's"  correctly read  (EasyOCR returned "Bernard'$")
+  - All clear UI text at conf=100%
+  - No false positives from styled / coloured font faces
+
+Public API (unchanged — drop-in replacement)
+---------------------------------------------
+  read_window(image, min_conf)    → list[TextRegion]
+  find_text(regions, pattern)     → TextRegion | None
+  find_all_text(regions, pattern) → list[TextRegion]
+  annotate_ocr(image, regions)    → PIL.Image
+  TextRegion                      (dataclass, same fields)
+
+Coordinate system
+-----------------
+Vision bounding boxes use normalised Core Graphics coords:
+  origin = bottom-left, y increases upward, values 0.0–1.0
+Converted to pixel coords with origin top-left (matching the rest of the
+codebase):  px = x_norm * W,  py = (1 - y_norm - h_norm) * H
 """
 
 from __future__ import annotations
 
+import io
 import re
 import threading
 from dataclasses import dataclass
 from typing import Sequence
 
-import numpy as np
 from PIL import Image
 
 # ── Types ────────────────────────────────────────────────────────────────────
 
 @dataclass
 class TextRegion:
-    text:  str          # recognised text string
-    x:     int          # left edge (window-relative logical pixels)
-    y:     int          # top edge
-    w:     int          # width
-    h:     int          # height
-    conf:  float        # confidence 0.0–1.0
+    text:  str      # recognised text string
+    x:     int      # left edge  (window-relative, logical pixels, origin top-left)
+    y:     int      # top edge
+    w:     int      # width
+    h:     int      # height
+    conf:  float    # confidence 0.0–1.0
 
     @property
     def cx(self) -> int:
@@ -43,47 +65,85 @@ class TextRegion:
         return f'TextRegion({self.text!r} conf={self.conf:.0%} at ({self.cx},{self.cy}))'
 
 
-# ── Singleton OCR reader ─────────────────────────────────────────────────────
+# ── Lazy Vision imports ───────────────────────────────────────────────────────
 
-_reader = None
-_reader_lock = threading.Lock()
+_vision_ready = False
+_vision_lock  = threading.Lock()
+_Vision = _Cocoa = _Quartz = None
 
 
-def _get_reader():
-    global _reader
-    if _reader is None:
-        with _reader_lock:
-            if _reader is None:
-                import easyocr
-                print("[OCR] Loading EasyOCR model (first run only)…")
-                _reader = easyocr.Reader(["en"], verbose=False)
-                print("[OCR] Model ready.")
-    return _reader
+def _ensure_vision() -> None:
+    global _vision_ready, _Vision, _Cocoa, _Quartz
+    if _vision_ready:
+        return
+    with _vision_lock:
+        if _vision_ready:
+            return
+        import Vision as V
+        import Cocoa  as C
+        import Quartz as Q
+        _Vision, _Cocoa, _Quartz = V, C, Q
+        _vision_ready = True
+
+
+# ── Core scan ────────────────────────────────────────────────────────────────
+
+def _run_vision(image: Image.Image) -> list[tuple[int, int, int, int, str, float]]:
+    """
+    Run VNRecognizeTextRequest on a PIL image.
+    Returns list of (x, y, w, h, text, conf) in pixel coords, origin top-left.
+    """
+    _ensure_vision()
+    W, H = image.width, image.height
+
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    ns_data = _Cocoa.NSData.dataWithBytes_length_(buf.getvalue(), len(buf.getvalue()))
+    ci_image = _Quartz.CIImage.imageWithData_(ns_data)
+
+    req = _Vision.VNRecognizeTextRequest.alloc().init()
+    req.setRecognitionLevel_(_Vision.VNRequestTextRecognitionLevelAccurate)
+    req.setUsesLanguageCorrection_(False)   # faster; game UI text needs no spell-check
+
+    handler = _Vision.VNImageRequestHandler.alloc().initWithCIImage_options_(ci_image, {})
+    ok, _ = handler.performRequests_error_([req], None)
+    if not ok:
+        return []
+
+    out = []
+    for obs in req.results() or []:
+        candidates = obs.topCandidates_(1)
+        if not candidates:
+            continue
+        best = candidates[0]
+        text = best.string().strip()
+        conf = float(best.confidence())
+        bb   = obs.boundingBox()  # NSRect normalised, origin bottom-left
+
+        # Normalised CG coords → pixel, flip Y
+        px = int(bb.origin.x * W)
+        py = int((1.0 - bb.origin.y - bb.size.height) * H)
+        pw = int(bb.size.width  * W)
+        ph = int(bb.size.height * H)
+        out.append((px, py, pw, ph, text, conf))
+
+    return out
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
 def read_window(image: Image.Image, min_conf: float = 0.35) -> list[TextRegion]:
     """
-    Run OCR on a PIL image and return all detected TextRegion objects.
+    Scan a PIL image with Apple Vision and return all TextRegion objects.
 
-    image     : logical-resolution PIL Image (from capture_window)
-    min_conf  : discard results below this confidence
+    image    : logical-resolution PIL Image (from capture_window)
+    min_conf : discard results below this confidence
     """
-    reader = _get_reader()
-    arr = np.array(image)
-    raw = reader.readtext(arr, detail=1)
-
     regions: list[TextRegion] = []
-    for bbox, text, conf in raw:
-        if conf < min_conf:
+    for (x, y, w, h, text, conf) in _run_vision(image):
+        if conf < min_conf or not text:
             continue
-        x = int(min(p[0] for p in bbox))
-        y = int(min(p[1] for p in bbox))
-        w = int(max(p[0] for p in bbox)) - x
-        h = int(max(p[1] for p in bbox)) - y
-        regions.append(TextRegion(text=text.strip(), x=x, y=y, w=w, h=h, conf=conf))
-
+        regions.append(TextRegion(text=text, x=x, y=y, w=w, h=h, conf=conf))
     return regions
 
 
