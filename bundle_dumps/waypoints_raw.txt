@@ -1,0 +1,631 @@
+
+# ── data_Route_Route — NOT FOUND IN BUNDLE ──
+
+
+# ──────────────────────────────────────────────────────────────────────
+# data_BattlePass_BattlePass  (1,684 chars)
+# ──────────────────────────────────────────────────────────────────────
+
+return
+{
+    ["AdvancedPassDiamond"]= 8888,
+    ["AdvancedSignInDrop"]= 10151,
+    ["BattlePassMinUnOpenDays"]= 0,
+    ["BattlePassOverdueRewardMail"]= 2601,
+    ["BattlePassPromptDays"]= 7,
+    ["DisplayUnlimitedLevel"]= 10,
+    ["GiftPackageBuyTimesLimit"]= 1,
+    ["GiftPackageDiamond"]= 20488,
+    ["GiftPackageDiamondDiscount"]= 16390,
+    ["InstanceDropRateFactor"]= 0,
+    ["IsCloseBattlePass"]= "0",
+    ["MaxLevel"]= 100,
+    ["PassSeason"]= 1,
+    ["PerLevelExp"]= 200,
+    ["PerLevelUpDiamond"]= 1200,
+    ["QuestExpWeekLimit"]= 12630,
+    ["SignInDrop"]= 10150,
+    ["SingleBuyMaxLevel"]= 120,
+    ["advancedWeeklyQuest"]= 2,
+    ["allDailyQuestResetCost"]= 5000,
+    ["allDailyQuestResetTimes"]= 2,
+    ["beFriendTimeForSendCard"]= 259200,
+    ["dailyQuestAmount"]= 12,
+    ["dailyQuestResetTimes"]= 3,
+    ["giftPackage2Discount"]= 0.7,
+    ["giftPackage2Level"]= 120,
+    ["giftPackage2MaxLevelDiscount"]= 0.8,
+    ["giftPackageLevel"]= 20,
+    ["halfAdvancedDiamond"]= 2488,
+    ["halfAdvancedDiscount"]= 1488,
+    ["halfAdvancedLevel"]= 25,
+    ["halfBattlePassOpenTime"]= 0,
+    ["levelDiscount"]= "30,50",
+    ["levelDiscountNum"]= "0.1,0.2",
+    ["levelDiscountOriginPrice"]= "36000,60000",
+    ["levelDiscountOriginPriceSeasonPass"]= "34000,178500",
+    ["levelDiscountPrice"]= "32400,48000",
+    ["levelDiscountPriceSeasonPass"]= "11600,99960",
+    ["levelDiscountSeasonPass"]= "20,120",
+    ["newVersionEnableTime"]= "2025-08-15 05:00:00",
+    ["newVersionFashion1"]= "2405001,4101173,4107001",
+    ["newVersionMaxLevel"]= 120,
+    ["recycleRewardStartLevel"]= 120,
+    ["sendCardCost"]= "20000",
+    ["weeklyQuestAmount"]= 8,
+    ["weeklyQuestResetTimes"]= 3
+}
+
+# ──────────────────────────────────────────────────────────────────────
+# data_SevenDayQuest_SevenDayQuest  (9,140 chars)
+# ──────────────────────────────────────────────────────────────────────
+
+local table = {
+	[1] = {
+		["Desc"] = "SevenDayQuest_01",
+		["Id"] = 1,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 230,
+		["TargetUI"] = "UI_RoleInfo",
+	},
+	[2] = {
+		["Desc"] = "SevenDayQuest_02",
+		["Id"] = 2,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 231,
+		["TargetUI"] = "UI_Professionalskill",
+	},
+	[3] = {
+		["Desc"] = "SevenDayQuest_03",
+		["Id"] = 3,
+		["Integral"] = 1,
+		["TargetParameter"] = {
+			20,
+		},
+		["TargetType"] = 150,
+		["TargetUI"] = "UI_Chat",
+		["UIParameterName"] = {
+			"defaultText",
+		},
+		["UIStrParameter"] = {
+			"SevenDayQuestText",
+		},
+	},
+	[4] = {
+		["Desc"] = "SevenDayQuest_04",
+		["GoToType"] = 4,
+		["Id"] = 4,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 63,
+	},
+	[5] = {
+		["Desc"] = "SevenDayQuest_05",
+		["Id"] = 5,
+		["Integral"] = 1,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 184,
+		["TargetUI"] = "UI_Friend",
+	},
+	[6] = {
+		["Desc"] = "SevenDayQuest_06",
+		["GoToType"] = 1,
+		["Id"] = 6,
+		["TargetNPC"] = {
+			10101013,
+			11101014,
+			11801007,
+			12101007,
+			13101009,
+			14101007,
+			16101008,
+			17101010,
+		},
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 139,
+	},
+	[7] = {
+		["Day"] = 2,
+		["Desc"] = "SevenDayQuest_07",
+		["Id"] = 7,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 15,
+		["TargetUI"] = "UI_Carnival",
+		["Times"] = 100,
+	},
+	[8] = {
+		["Day"] = 2,
+		["Desc"] = "SevenDayQuest_08",
+		["Id"] = 8,
+		["TargetParameter"] = {
+			1,
+		},
+		["TargetType"] = 2,
+		["TargetUI"] = "UI_Life",
+		["Times"] = 3,
+	},
+	[9] = {
+		["Day"] = 2,
+		["Desc"] = "SevenDayQuest_09",
+		["Id"] = 9,
+		["TargetParameter"] = {
+			2,
+		},
+		["TargetType"] = 2,
+		["TargetUI"] = "UI_Life",
+		["Times"] = 5,
+	},
+	[10] = {
+		["Day"] = 2,
+		["Desc"] = "SevenDayQuest_10",
+		["Id"] = 10,
+		["TargetParameter"] = {
+			3,
+		},
+		["TargetType"] = 2,
+		["TargetUI"] = "UI_Life",
+		["Times"] = 3,
+	},
+	[11] = {
+		["Day"] = 2,
+		["Desc"] = "SevenDayQuest_11",
+		["GoToType"] = 2,
+		["Id"] = 11,
+		["Integral"] = 1,
+		["TargetLocation"] = {
+			1530.0,
+			-7.8,
+			18.8,
+		},
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 82,
+	},
+	[12] = {
+		["Day"] = 2,
+		["Desc"] = "SevenDayQuest_12",
+		["GoToType"] = 1,
+		["Id"] = 12,
+		["TargetNPC"] = {
+			10101010,
+			11101011,
+			11801005,
+			12101005,
+			13101007,
+			14101005,
+			16101019,
+		},
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 84,
+	},
+	[13] = {
+		["Day"] = 3,
+		["Desc"] = "SevenDayQuest_13",
+		["Id"] = 13,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 41,
+		["TargetUI"] = "UI_OdinRecommend",
+		["Times"] = 1000,
+	},
+	[14] = {
+		["Day"] = 3,
+		["Desc"] = "SevenDayQuest_14",
+		["GoToType"] = 1,
+		["Id"] = 14,
+		["TargetNPC"] = {
+			11709999,
+		},
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 71,
+		["Times"] = 5,
+	},
+	[15] = {
+		["Day"] = 3,
+		["Desc"] = "SevenDayQuest_15",
+		["GoToType"] = 1,
+		["Id"] = 15,
+		["Integral"] = 3,
+		["TargetNPC"] = {
+			10101008,
+			11101043,
+			11801046,
+			12101009,
+			13101039,
+			14101036,
+			16101006,
+			17101005,
+		},
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 23,
+		["Times"] = 5,
+	},
+	[16] = {
+		["Day"] = 3,
+		["Desc"] = "SevenDayQuest_16",
+		["GoToType"] = 1,
+		["Id"] = 16,
+		["Integral"] = 3,
+		["TargetNPC"] = {
+			10101007,
+			11101044,
+			11801045,
+			12101036,
+			13101036,
+			14101009,
+			16101005,
+			17101006,
+		},
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 27,
+		["Times"] = 3,
+	},
+	[17] = {
+		["Day"] = 3,
+		["Desc"] = "SevenDayQuest_17",
+		["Id"] = 17,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 65,
+		["TargetUI"] = "UI_Carnival",
+		["Times"] = 3,
+	},
+	[18] = {
+		["Day"] = 3,
+		["Desc"] = "SevenDayQuest_18",
+		["Id"] = 18,
+		["Integral"] = 1,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 75,
+		["TargetUI"] = "UI_Friend",
+	},
+	[19] = {
+		["Day"] = 4,
+		["Desc"] = "SevenDayQuest_19",
+		["Id"] = 19,
+		["TargetParameter"] = {
+			1,
+		},
+		["TargetUI"] = "UI_Life",
+		["Times"] = 20,
+	},
+	[20] = {
+		["Day"] = 4,
+		["Desc"] = "SevenDayQuest_20",
+		["Id"] = 20,
+		["TargetParameter"] = {
+			2,
+		},
+		["TargetUI"] = "UI_Life",
+		["Times"] = 20,
+	},
+	[21] = {
+		["Day"] = 4,
+		["Desc"] = "SevenDayQuest_21",
+		["Id"] = 21,
+		["TargetParameter"] = {
+			3,
+		},
+		["TargetUI"] = "UI_Life",
+		["Times"] = 20,
+	},
+	[22] = {
+		["Day"] = 4,
+		["Desc"] = "SevenDayQuest_22",
+		["Id"] = 22,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			4,
+		},
+		["TargetUI"] = "UI_Life",
+		["Times"] = 3,
+	},
+	[23] = {
+		["Day"] = 4,
+		["Desc"] = "SevenDayQuest_23",
+		["GoToType"] = 2,
+		["Id"] = 23,
+		["TargetLocation"] = {
+			1530.0,
+			-7.8,
+			18.8,
+		},
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 127,
+		["Times"] = 3,
+	},
+	[24] = {
+		["Day"] = 4,
+		["Desc"] = "SevenDayQuest_24",
+		["GoToType"] = 1,
+		["Id"] = 24,
+		["Integral"] = 3,
+		["TargetNPC"] = {
+			11709999,
+		},
+		["TargetParameter"] = {
+			2010,
+			2011,
+			2020,
+			2021,
+			2030,
+			2031,
+			2040,
+			2041,
+			2050,
+			2051,
+			2060,
+			2061,
+			2070,
+			2071,
+			2080,
+			2081,
+		},
+		["TargetType"] = 134,
+		["Times"] = 6,
+	},
+	[25] = {
+		["Day"] = 5,
+		["Desc"] = "SevenDayQuest_25",
+		["Id"] = 25,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 114,
+		["TargetUI"] = "UI_Jobber",
+	},
+	[26] = {
+		["Day"] = 5,
+		["Desc"] = "SevenDayQuest_26",
+		["Id"] = 26,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 162,
+		["TargetUI"] = "UI_Jobber",
+		["Times"] = 2,
+	},
+	[27] = {
+		["Day"] = 5,
+		["Desc"] = "SevenDayQuest_27",
+		["Id"] = 27,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 84,
+		["TargetUI"] = "UI_Carnival",
+		["Times"] = 15,
+	},
+	[28] = {
+		["Day"] = 5,
+		["Desc"] = "SevenDayQuest_28",
+		["GoToType"] = 1,
+		["Id"] = 28,
+		["Integral"] = 3,
+		["TargetNPC"] = {
+			10101016,
+		},
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 45,
+	},
+	[29] = {
+		["Day"] = 5,
+		["Desc"] = "SevenDayQuest_29",
+		["Id"] = 29,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 138,
+		["TargetUI"] = "UI_HandBook",
+		["UIParameter"] = {
+			0,
+		},
+		["UIParameterName"] = {
+			"uiType",
+		},
+	},
+	[30] = {
+		["Day"] = 5,
+		["Desc"] = "SevenDayQuest_30",
+		["Id"] = 30,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 232,
+		["TargetUI"] = "UI_ExteriorNew",
+	},
+	[31] = {
+		["Day"] = 6,
+		["Desc"] = "SevenDayQuest_31",
+		["Id"] = 31,
+		["IsGuild"] = 1,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 11,
+		["TargetUI"] = "UI_Guild",
+		["Times"] = 3,
+	},
+	[32] = {
+		["Day"] = 6,
+		["Desc"] = "SevenDayQuest_32",
+		["GoToType"] = 4,
+		["Id"] = 32,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 10,
+		["Times"] = 10,
+	},
+	[33] = {
+		["Day"] = 6,
+		["Desc"] = "SevenDayQuest_33",
+		["Id"] = 33,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 233,
+		["TargetUI"] = "UI_Carnival",
+		["Times"] = 3,
+	},
+	[34] = {
+		["Day"] = 6,
+		["Desc"] = "SevenDayQuest_34",
+		["Id"] = 34,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			10,
+		},
+		["TargetType"] = 33,
+		["TargetUI"] = "UI_Bag",
+	},
+	[35] = {
+		["Day"] = 6,
+		["Desc"] = "SevenDayQuest_35",
+		["Id"] = 35,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			2,
+		},
+		["TargetType"] = 35,
+		["TargetUI"] = "UI_Bag",
+	},
+	[36] = {
+		["Day"] = 6,
+		["Desc"] = "SevenDayQuest_36",
+		["Id"] = 36,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			2,
+		},
+		["TargetType"] = 34,
+		["TargetUI"] = "UI_Bag",
+	},
+	[37] = {
+		["Day"] = 7,
+		["Desc"] = "SevenDayQuest_37",
+		["Id"] = 37,
+		["Integral"] = 4,
+		["TargetParameter"] = {
+			20,
+		},
+		["TargetType"] = 234,
+		["TargetUI"] = "UI_Carnival",
+	},
+	[38] = {
+		["Day"] = 7,
+		["Desc"] = "SevenDayQuest_38",
+		["Id"] = 38,
+		["Integral"] = 4,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 13,
+		["TargetUI"] = "UI_Bag",
+	},
+	[39] = {
+		["Day"] = 7,
+		["Desc"] = "SevenDayQuest_39",
+		["Id"] = 39,
+		["Integral"] = 3,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 235,
+		["TargetUI"] = "UI_Carnival",
+	},
+	[40] = {
+		["Day"] = 7,
+		["Desc"] = "SevenDayQuest_40",
+		["Id"] = 40,
+		["Integral"] = 1,
+		["TargetParameter"] = {
+			20,
+		},
+		["TargetType"] = 150,
+		["TargetUI"] = "UI_Chat",
+		["UIParameterName"] = {
+			"defaultText",
+		},
+		["UIStrParameter"] = {
+			"SevenDayQuestText",
+		},
+	},
+	[41] = {
+		["Day"] = 7,
+		["Desc"] = "SevenDayQuest_41",
+		["GoToType"] = 4,
+		["Id"] = 41,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 44,
+		["Times"] = 10,
+	},
+	[42] = {
+		["Day"] = 7,
+		["Desc"] = "SevenDayQuest_42",
+		["Id"] = 42,
+		["Integral"] = 4,
+		["TargetParameter"] = {
+			0,
+		},
+		["TargetType"] = 16,
+		["TargetUI"] = "UI_MVPBoss",
+	},
+}
+local baseTable = 
+{
+	["Day"] = 1,
+	["DropId"] = 0,
+	["GoToType"] = 3,
+	["Integral"] = 2,
+	["IsGuild"] = 0,
+	["ParameterType"] = 1,
+	["TargetLocation"] = {},
+	["TargetNPC"] = {},
+	["TargetType"] = 53,
+	["TargetUI"] = "",
+	["Times"] = 1,
+	["UIParameter"] = {},
+	["UIParameterName"] = {},
+	["UIStrParameter"] = {},
+}
+for _,v in pairs(table) do
+	setmetatable(v,{__index  = baseTable});
+end
+return table;

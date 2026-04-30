@@ -1,5 +1,3 @@
-# All Lua TextAsset script names found in this bundle
-
 data_CameraFilter_CameraFilter
     local table= {
 

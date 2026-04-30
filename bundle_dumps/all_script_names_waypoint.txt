@@ -1,0 +1,819 @@
+data_BackSoundEffectsInfo
+    
+
+data_BackSoundEffects_BackSoundEffects
+    local table= {
+
+data_Badge_Badge
+    local table= {
+
+data_Bait_Bait
+    local table = {
+
+data_BarrageColor_BarrageColor
+    local table= {
+
+data_Barrage_Barrage
+    local table= {
+
+data_BaseLevelGrowth
+    local table = {
+
+data_BattleAchievement_BattleAchievementChain
+    local table = {
+
+data_BattleAchievement_BattleAchievementGroup
+    local table = {
+
+data_BattleAchievement_BattleAchievementMedalAttr
+    local table = {
+
+data_BattleAchievement_BattleAchievementMedalSlot
+    local table = {
+
+data_BattleAchievement_BattleAchievementQuest
+    local table = {
+
+data_BattleAchievement_BattleAchievementSet
+    local table = {
+
+data_BattleAchievement_BattleAchievementSubGroup
+    local table = {
+
+data_BattleAchievement_BattleAchievementTotal
+    local table = {
+
+data_BattleAchievement_BattleAchievementUnitPrice
+    local table = {
+
+data_BattleArea_BattleArea
+    local table = {
+
+data_BattlePass_BattlePass
+    return
+
+data_BattlePass_BattlePassLevelReward
+    local table = {
+
+data_BattlePass_BattlePassQuest
+    local table = {
+
+data_BattlePass_ChallengeParam
+    local table = {
+
+data_BeautyContestGiftsRankAward_BeautyContestGiftsRankAward
+    local table = {
+
+data_BeautyContestGifts_BeautyContestGifts
+    local table = {
+
+data_BeautyContestPetAngle_BeautyContestPetAngle
+    local table= {
+
+data_BuffInfo
+    
+
+data_BulletInfo
+    
+
+data_Bullet_Bullet
+    local table = {
+
+data_BundleOptPath
+    local table= {
+
+data_BundleOptPathInfo
+    
+
+data_GVG_GvgHomepage
+    local table = {
+
+data_GashaponBase
+    local table = {
+
+data_GashaponEgg
+    local table = {
+
+data_GashaponPool
+    local table = {
+
+data_GashaponTally
+    local table = {
+
+data_GeneralDressInfo
+    
+
+data_GeneralDress_GeneralDress
+    local table = {
+
+data_GeneralParameter_GeneralParameter
+    local table = {
+
+data_GiftBoxInterface_GiftBoxInterface
+    local table = {
+
+data_GiftBoxV2
+    local table = {
+
+data_GiftLibrary
+    local table = {
+
+data_Gifts_Gifts
+    local table = {
+
+data_GmActivityName
+    local table = {
+
+data_GradeInstance_GradeInstance
+    local table = {
+
+data_GratitudeSeason_GratitudeSeasonBuff
+    local table = {
+
+data_GratitudeSeason_GratitudeSeasonGift
+    local table = {
+
+data_GratitudeSeason_GratitudeSeasonKv
+    return
+
+data_GratitudeSeason_GratitudeSeasonNpc
+    local table = {
+
+data_GratitudeSeason_GratitudeSeasonVote
+    local table = {
+
+data_Guide_Guide
+    local table = {
+
+data_Guide_HandbookBaseAttrGuide
+    local table = {
+
+data_Guide_HandbookDebuffGuide
+    local table = {
+
+data_Guide_HandbookEnchantGuide
+    local table = {
+
+data_Guide_HandbookGuide
+    local table = {
+
+data_Guide_SkillGuide
+    local table = {
+
+data_GuildNewOrderConfig_GuildNewOrderConfig
+    local table = {
+
+data_GuildNewOrderMaterial_GuildNewOrderMaterial
+    local table = {
+
+data_GunInfo
+    
+
+data_Gun_Gun
+    local table = {
+
+data_InstanceBossInfo
+    local InstanceBossInfo={
+
+data_InstanceGroup_InstanceGroup
+    local table = {
+
+data_Interface
+    local table = {
+
+data_InternationalChampion_ICAuditionSchedule
+    local table = {
+
+data_InternationalChampion_ICConfig
+    return
+
+data_InternationalChampion_ICDecomposition
+    local table = {
+
+data_InternationalChampion_ICEnchantmentAttr
+    local table = {
+
+data_InternationalChampion_ICRefine
+    local table = {
+
+data_InternationalChampion_ICStrengthen
+    local table = {
+
+data_InternationalChampion_ICTeamLogo
+    local table = {
+
+data_ItemCardInfo
+    
+
+data_ItemEnergy_ItemEnergy
+    local table = {
+
+data_ItemInfo
+    
+
+data_ItemType
+    local table = {
+
+data_ItemV2Info
+    
+
+data_ItemV2_CardAdvAttr
+    local table = {
+
+data_ItemV2_CardReset
+    local table = {
+
+data_ItemV2_CardUpgrade
+    local table = {
+
+data_ItemV2_ItemBox
+    local table = {
+
+data_ItemV2_ItemCard
+    local table = {
+
+data_ItemV2_ItemV2
+    local table = {
+
+data_SceneAttributeInfo
+    
+
+data_SceneDynamicNPCInfo
+    
+
+data_SceneInfo
+    
+
+data_SceneRes
+    local table = {
+
+data_SceneTimeInfo
+    
+
+data_SceneTime_SceneTime
+    local table = {
+
+data_ScenicSpot_ScenicSpot
+    local table = {
+
+data_ScenicSpot_sceneMonster_SceneMonster
+    local table = {
+
+data_SchoolOpeningEvent_SchoolOpeningEvent
+    local table = {
+
+data_SeasonLevelInfo
+    
+
+data_SeasonLevelV2Info
+    
+
+data_SeasonNoticeInfo
+    
+
+data_Season_SeasonConfig
+    local table = {
+
+data_Season_SeasonInstance
+    local table = {
+
+data_Season_SeasonKV
+    return
+
+data_Season_SeasonLevel
+    local table = {
+
+data_Season_SeasonLevelV2
+    local table = {
+
+data_Season_SeasonNotice
+    local table = {
+
+data_Season_SeasonPass
+    local table = {
+
+data_Season_SeasonPassList
+    local table = {
+
+data_Season_SeasonPeakTask
+    local table = {
+
+data_Season_SeasonPointMail
+    local table = {
+
+data_Season_SeasonServerBattle
+    local table = {
+
+data_Season_SeasonServerBattlePoints
+    local table = {
+
+data_Season_SeasonServerBattleReward
+    local table = {
+
+data_Season_SeasonTask
+    local table = {
+
+data_Season_SeasonTaskV2
+    local table = {
+
+data_Season_SeasonTeamBattleMail
+    local table = {
+
+data_Season_SeasonTeamBattleReward
+    local table = {
+
+data_Season_SeasonTowerDifficulty
+    local table = {
+
+data_Season_SeasonTowerGradeCondition
+    local table = {
+
+data_Season_SeasonTowerInfiniteAttr
+    local table = {
+
+data_Season_SeasonTowerKV
+    return
+
+data_Season_SeasonTowerLayer
+    local table = {
+
+data_Season_SeasonTowerRandom
+    local table = {
+
+data_Season_SeasonTowerRankReward
+    local table = {
+
+data_Season_SeasonYearNotice
+    local table = {
+
+data_SelectRolePos
+    local table = {
+
+data_Setting_Setting
+    local table = {
+
+data_Setting_SettingShowBtn
+    local table = {
+
+data_Setting_SettingValue
+    local table = {
+
+data_SevenDayQuest_SevenDayQuest
+    local table = {
+
+data_SevenDayReward_SevenDayReward
+    local table = {
+
+data_ShadowWeapon_ShadowWeapon
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponCommonCost
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponExp
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponExtraProbability
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponInheritanceLevel
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponInheritanceLevelCost
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponKVConfig
+    return
+
+data_ShadowWeapon_ShadowWeaponLevel
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponProp
+    local __rt_1 = {
+
+data_ShadowWeapon_ShadowWeaponPropCommonCost
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponShow
+    local table= {
+
+data_ShadowWeapon_ShadowWeaponSkill
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponSkillCommonCost
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponSkillCost
+    local __rt_1 = {
+
+data_ShadowWeapon_ShadowWeaponSkillExtraProbability
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponSkillGroup
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponSkillInheritLevel
+    local table = {
+
+data_ShadowWeapon_ShadowWeaponTask
+    local table= {
+
+data_ShopAI_ShopAI
+    local table = {
+
+data_Shop_ExchangeGoods
+    local table = {
+
+data_Shop_ExchangeStore
+    local table = {
+
+data_Shop_Goods
+    local table = {
+
+data_Shop_Store
+    local table = {
+
+data_SkillFactor
+    local SkillFactor =
+
+data_SkillInfo
+    
+
+data_SkillResInfo
+    
+
+data_SkillTitleInfo
+    
+
+data_SkillWeapon
+    local table= {
+
+data_SkillWeaponInfo
+    
+
+data_SmallMap
+    local table = {
+
+data_SmallMapCompete
+    local table = {
+
+data_SmallMapCompeteInfo
+    
+
+data_SmallMapInfo
+    
+
+data_SnowFestival_IceFishing
+    local table = {
+
+data_SnowFestival_IceFishingBait
+    local table = {
+
+data_SnowFestival_IceFishingExtra
+    local table = {
+
+data_SnowFestival_IceFishingRanking
+    local table = {
+
+data_SnowFestival_SnowFestival
+    return
+
+data_SnowFestival_SnowQuest
+    local table = {
+
+data_SocialActionInfo
+    
+
+data_SocialCoupleActionInfo
+    
+
+data_SoundEffects_SoundEffects
+    local table = {
+
+data_SpecialLoading_SpecialLoading
+    local table = {
+
+data_SpringFestival_SpringFestivalArea
+    local table = {
+
+data_SpringFestival_SpringFestivalKV
+    return
+
+data_Stall
+    return
+
+data_SummerHomeworkStore_SummerHomeworkStore
+    local table= {
+
+data_SummerHomeworkTask_SummerHomeworkTask
+    local table = {
+
+data_SystemLock
+    local table = {
+
+data_TaskCamera_TaskCamera
+    local table= {
+
+data_TaskStory_TaskStory
+    local table = {
+
+data_TeamBattle_TeamBattleConfig
+    local table = {
+
+data_TeamBattle_TeamBattleExperience
+    local table = {
+
+data_TeamBattle_TeamBattleKV
+    return
+
+data_TeamBattle_TeamBattleSeason
+    local table = {
+
+data_TeamBattle_TeamBattleSeasonDan
+    local table = {
+
+data_TeamBattle_TeamBattleSeasonDanType
+    local table = {
+
+data_TeamBattle_TeamBattleSeasonLevelRange
+    local table = {
+
+data_TeamBattle_TeamBattleSeasonRank
+    local table = {
+
+data_TeamTargetType
+    local table = {
+
+data_TeleportInfo
+    
+
+data_TeleportSceneInfo
+    
+
+data_TestRobot_RobotFashion
+    local table= {
+
+data_TestRobot_RobotGuildName
+    local table= {
+
+data_TestRobot_RobotName
+    local table= {
+
+data_TestRobot_TestRobot
+    local table = {
+
+data_ThumbsUp_ThumbsUp
+    local table= {
+
+data_TimeLineTalkInfo
+    
+
+data_TimeLineTalk_TimeLineTalk
+    local table = {
+
+data_Timeline_Timeline
+    local table = {
+
+data_TitleInfo
+    
+
+data_ToyFacActivity_ToyFacActivity
+    return
+
+data_ToyFacSledRepairReward_ToyFacSledRepairReward
+    local table = {
+
+data_ToyFacSledRepairServerReward_ToyFacSledRepairServerReward
+    local table = {
+
+data_Trade_Trade
+    local table = {
+
+data_Tradepresent_Tradepresent
+    local table= {
+
+data_Traderelateprice_Traderelateprice
+    local table = {
+
+data_TransferConfigInfo
+    
+
+data_Transfer_BattlePlan
+    local table = {
+
+data_Transfer_TransferConfig
+    local table = {
+
+data_TriggerInfo
+    
+
+data_baselevel
+    local baselevel={
+
+data_buff_Buff
+    local table = {
+
+data_businessTask_BusinessTaskMain
+    local table = {
+
+data_businessTask_ringTaskConfig
+    local table = {
+
+data_businessTask_ringTaskPick
+    local table= {
+
+data_businessTask_ringTaskStepAward
+    local table = {
+
+data_ghostPasswordAction_ghostPasswordAction
+    local table = {
+
+data_guild_GuildBattlePassQuest
+    local table = {
+
+data_guild_GuildBattlePassReward
+    local table= {
+
+data_guild_GuildNewBattlePass
+    local table = {
+
+data_guild_GuildNewOrder
+    local table = {
+
+data_guild_GuildOrderItemValue
+    local table = {
+
+data_guild_GuildOrderRankAward
+    local table = {
+
+data_guild_GuildServant
+    local table= {
+
+data_guild_guild
+    local table = {
+
+data_guild_guildActivity
+    local table = {
+
+data_guild_guildKvmAward
+    local table = {
+
+data_guild_guildKvmBattleAreaAward
+    local table = {
+
+data_guild_guildOrder
+    local table = {
+
+data_guild_guildPermit
+    local table = {
+
+data_guild_guildPray
+    local table = {
+
+data_guild_guildPve
+    local table = {
+
+data_guild_guildPveAward
+    local table = {
+
+data_guild_guildPveLevel
+    local table = {
+
+data_guild_guildRewardOrder
+    local table = {
+
+data_guild_guildSkill
+    local table= {
+
+data_guild_guildStructure
+    local table= {
+
+data_guild_guildUpdate
+    local table = {
+
+data_guild_guildV2
+    return
+
+data_item_CardCoordinates
+    local table = {
+
+data_item_CardCoordinatesAttr
+    local table = {
+
+data_item_CardCoordinatesGroup
+    local table = {
+
+data_item_CdGroup
+    local table = {
+
+data_item_Item
+    local table = {
+
+data_item_ItemTypeList
+    local table = {
+
+data_sceneMonster_SceneMonster
+    local table = {
+
+data_scene_DownshiftOptimization
+    local table= {
+
+data_scene_Scene
+    local table = {
+
+data_scene_SceneAttribute
+    local table = {
+
+data_scene_SceneLine
+    local table = {
+
+data_scene_SceneLogic
+    local table = {
+
+data_scene_SceneMapIcon
+    local table = {
+
+data_scene_SceneMapIconMode
+    local table = {
+
+data_scene_ScenePreload
+    local table = {
+
+data_scene_TeleportScene
+    local table = {
+
+data_scenemonster
+    local table = {
+
+data_school_MonsterCollection
+    local table = {
+
+data_school_MonsterCollectionTask
+    local table = {
+
+data_school_NpcCollection
+    local table = {
+
+data_skill_CommonSkill
+    local table = {
+
+data_skill_Skill
+    local __rt_1 = {
+
+data_skill_SkillRes
+    local table = {
+
+data_skill_SkillTitle
+    local table = {
+
+data_skill_Talent
+    local table = {
+
+data_storeFashion_storeFashion
+    local table = {
+
+data_task_Task
+    local __rt_1 = {
+
+data_task_TaskAnswer
+    local table = {
+
+data_task_TaskGroup
+    local table = {
+
+data_team_TeamGoal
+    local table = {
+
+data_team_TeamRecommend
+    local table = {
+
+data_team_TeamTarget
+    local table= {
+
+data_teleport_Teleport
+    local table = {
+
+data_tower_Tower
+    local table= {
+
+data_tower_TowerBase
+    local table = {
+
+data_tower_TowerBless
+    local table= {
+
+data_tower_TowerLayer
+    local table = {
+
+data_towerbase_TowerBase
+    local table = {
+
+data_treasureMap_TreasureMap
+    local table= {
+
+data_triggerGenerator_TriggerGenerator
+    local table = {
+
+data_trigger_Trigger
+    local table = {
+

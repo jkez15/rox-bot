@@ -222552,7 +222552,5 @@ npc_DynamicNPC.funcNew=function()end;
 return npc_DynamicNPC
 
 
-# ──────────────────────────────────────────────────────────────────────
-# data_DynamicNPCInfo  (549,140 chars)
-# ──────────────────────────────────────────────────────────────────────
+# ── data_DynamicNPCInfo — COMPILED BYTECODE (not readable) ──
 

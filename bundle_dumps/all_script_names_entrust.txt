@@ -1,0 +1,228 @@
+data_EmoticonInfo
+    
+
+data_EnchantTransformation_EnchantTransformation
+    local table = {
+
+data_EquipInfo
+    
+
+data_EquipRefineFxInfo
+    
+
+data_EquipSlots
+    local table = {
+
+data_EquipSource_EquipSource
+    local table= {
+
+data_EquipmentSmelting_EquipmentSmelting
+    local table = {
+
+data_EquipmentTypeInfo
+    
+
+data_ExpNDrop
+    local table = {
+
+data_JobInfo
+    
+
+data_JobReward
+    local table = {
+
+data_OnePunchMan_BpHeroRating
+    local table = {
+
+data_OnePunchMan_EliminateDisasters
+    local table = {
+
+data_OnePunchMan_EliminateDisastersReward
+    local table = {
+
+data_OnePunchMan_OnePunchKV
+    return
+
+data_OnePunchMan_OnePunchOrder
+    local table = {
+
+data_OperatingActivities_OperatingActivities
+    local table = {
+
+data_OtherSmallGame_Crossverbswords_Crossverbswords
+    local table = {
+
+data_OtherSmallGame_Jigsaw_Jigsaw
+    local table = {
+
+data_OtherSmallGame_Reasoning_Reasoning
+    local table = {
+
+data_QiXi_QixiOdinDrop
+    local table= {
+
+data_QiXi_QixiWish
+    local table = {
+
+data_QualityInfo
+    
+
+data_QualitySceneInfo
+    
+
+data_Quality_Quality
+    local table = {
+
+data_Quality_QualityScene
+    local table = {
+
+data_emoticon_Emoticon
+    local table = {
+
+data_emoticon_SocialAction
+    local table = {
+
+data_emoticon_SocialCoupleAction
+    local table = {
+
+data_emoticon_facialExpression
+    local table = {
+
+data_entrust_LoversQuestPool
+    local table= {
+
+data_entrust_QuestBoard
+    local table = {
+
+data_entrust_QuestSpecialPool
+    local table = {
+
+data_equip_Appraisal
+    local table = {
+
+data_equip_AppraisalLib
+    local table = {
+
+data_equip_AttrPool
+    local table = {
+
+data_equip_CardSuit
+    local table = {
+
+data_equip_EnchantmentAttr
+    local __rt_1 = {
+
+data_equip_EnchantmentAttrLib
+    local table = {
+
+data_equip_EnchantmentAttrLock
+    local table = {
+
+data_equip_EnchantmentJob
+    local table = {
+
+data_equip_EnchantmentRandom
+    local table = {
+
+data_equip_Equip
+    local __rt_1 = {
+
+data_equip_EquipRecommend
+    local table = {
+
+data_equip_EquipRefineFx
+    local table = {
+
+data_equip_EquipSlots
+    local table= {
+
+data_equip_EquipmentDecomposition
+    local table = {
+
+data_equip_EquipmentFormula
+    local table = {
+
+data_equip_EquipmentRepair
+    local table = {
+
+data_equip_EquipmentSuit
+    local __rt_1 = {
+
+data_equip_EquipmentType
+    local table = {
+
+data_equip_HeadwearAngle
+    local table = {
+
+data_equip_ItemCombine
+    local table = {
+
+data_equip_ItemSplit
+    local table = {
+
+data_equip_NpcSlot
+    local table = {
+
+data_equip_PropID
+    local table = {
+
+data_equip_PunchHoleCost
+    local table = {
+
+data_equip_Refine
+    local __rt_1 = {
+
+data_equip_RefineHighLevel
+    local table = {
+
+data_equip_RefineProtect
+    local table = {
+
+data_equip_RefineSlotInherit
+    local table= {
+
+data_equip_RefineTicket
+    local table = {
+
+data_equip_RemoveCardCost
+    local table = {
+
+data_equip_SlotStrengthen
+    local __rt_1 = {
+
+data_equip_Suit
+    local table = {
+
+data_equip_UpgradeInherit
+    local table = {
+
+data_escort_Escort
+    local table = {
+
+data_job_Job
+    local table = {
+
+data_job_JobBranch
+    local table = {
+
+data_job_JobChange
+    local table = {
+
+data_job_JobItem
+    local table = {
+
+data_job_JobTest
+    local table = {
+
+data_joblevel
+    local table = {
+
+data_question_AdventureQuestionConfig
+    local table= {
+
+data_question_question
+    local table = {
+
+data_question_questionConfig
+    local table= {
+

@@ -91,8 +91,7 @@ def load_bundle(key: str):
 
 def dump_script_names(scripts: dict[str, str], out_file: str) -> None:
     """Write a sorted list of all script names + first-line previews."""
-    with open(out_file, "w", encoding="utf-8") as f:
-        f.write("# All Lua TextAsset script names found in this bundle\n\n")
+    with open(out_file, "w", encoding="utf-8", errors="replace") as f:
         for name in sorted(scripts.keys()):
             preview = scripts[name].split("\n")[0][:120].strip()
             f.write(f"{name}\n    {preview}\n\n")
@@ -101,14 +100,14 @@ def dump_script_names(scripts: dict[str, str], out_file: str) -> None:
 
 def dump_raw(scripts: dict[str, str], script_names: list[str], out_file: str) -> None:
     """Write the raw Lua text of named scripts to a file."""
-    with open(out_file, "w", encoding="utf-8") as f:
+    with open(out_file, "w", encoding="utf-8", errors="replace") as f:
         for name in script_names:
             if name not in scripts:
                 f.write(f"\n# ── {name} — NOT FOUND IN BUNDLE ──\n\n")
                 continue
             text = scripts[name]
-            # Skip compiled bytecode (Lua 5.3 header \x1bLua)
-            if text.startswith("\x1bLua") or "\x1bLua" in text[:8]:
+            # Skip compiled bytecode (Lua 5.3 header \x1bLua or binary garbage)
+            if "\x1bLua" in text[:16] or "\x00" in text[:32]:
                 f.write(f"\n# ── {name} — COMPILED BYTECODE (not readable) ──\n\n")
                 continue
             f.write(f"\n# {'─'*70}\n")

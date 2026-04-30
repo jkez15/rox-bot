@@ -1,0 +1,3 @@
+# data_npc_SceneNPC — 0 NPCs
+# scene_id  unique_id   posx        posz        name
+
