@@ -119,29 +119,50 @@ def dump_raw(scripts: dict[str, str], script_names: list[str], out_file: str) ->
 
 
 def extract_scene_npcs(scripts: dict[str, str]) -> list[dict]:
-    """Parse data_npc_SceneNPC into a list of dicts with key fields."""
+    """Parse data_npc_SceneNPC into a list of dicts with key fields.
+
+    The SceneNPC structure is:
+      [SCENE_ID] = {
+          sceneGenerator = {
+              { uniqueid = 123, name = "...", posx = ..., posz = ..., ... },
+              { ... },
+          }
+      }
+
+    We find each scene block by its top-level [SCENE_ID] = { key, then
+    extract NPCs by finding each uniqueid entry and pulling surrounding
+    fields from the enclosing chunk of Lua.
+    """
     text = scripts.get("data_npc_SceneNPC", "")
     if not text:
         return []
     records = []
-    # Split on top-level numeric keys: [12345] = {
-    for block_m in re.finditer(r'\[(\d+)\] = \{(.*?)\n\s*\}', text, re.DOTALL):
-        scene_id = int(block_m.group(1))
-        block = block_m.group(2)
-        for npc_m in re.finditer(
-            r'\["uniqueid"\] = (\d+).*?'
-            r'\["name"\] = "([^"]*)".*?'
-            r'\["posx"\] = ([\-\d.]+).*?'
-            r'\["posz"\] = ([\-\d.]+)',
-            block,
-            re.DOTALL,
-        ):
+
+    # Find top-level scene blocks: [1010] = {
+    scene_starts = list(re.finditer(r'\n\t\[(\d{4,5})\]\s*=\s*\{', text))
+    for i, scene_m in enumerate(scene_starts):
+        scene_id = int(scene_m.group(1))
+        start = scene_m.end()
+        end = scene_starts[i + 1].start() if i + 1 < len(scene_starts) else len(text)
+        block = text[start:end]
+
+        # Find all NPCs inside this scene block via their uniqueid field
+        for uid_m in re.finditer(r'\["uniqueid"\]\s*=\s*(\d+)', block):
+            uid = int(uid_m.group(1))
+            pos = uid_m.start()
+            # Grab a generous chunk around this NPC entry (700 chars back, 200 forward)
+            chunk = block[max(0, pos - 700):pos + 200]
+
+            name_m = re.search(r'\["name"\]\s*=\s*"([^"]*)"', chunk)
+            posx_m = re.search(r'\["posx"\]\s*=\s*([\-\d.eE+]+)', chunk)
+            posz_m = re.search(r'\["posz"\]\s*=\s*([\-\d.eE+]+)', chunk)
+
             records.append({
                 "scene_id":  scene_id,
-                "unique_id": int(npc_m.group(1)),
-                "name":      npc_m.group(2),
-                "posx":      float(npc_m.group(3)),
-                "posz":      float(npc_m.group(4)),
+                "unique_id": uid,
+                "name":      name_m.group(1) if name_m else "?",
+                "posx":      float(posx_m.group(1)) if posx_m else 0.0,
+                "posz":      float(posz_m.group(1)) if posz_m else 0.0,
             })
     return records
 

@@ -131,16 +131,21 @@ def _load_scene_npc(UnityPy) -> None:
 
         text = data.m_Script
         for npc_id in ENTRUST_NPC_IDS:
+            # Search for the uniqueid within the sceneGenerator arrays
             pattern = f'"uniqueid"] = {npc_id},'
             if pattern not in text:
-                continue
+                # Also try the tab-indented format
+                pattern = f'"uniqueid"] = {npc_id}'
+                if pattern not in text:
+                    continue
             idx = text.index(pattern)
-            chunk = text[max(0, idx - 600):idx + 200]
+            chunk = text[max(0, idx - 700):idx + 200]
 
             name_m = re.search(r'"name"\] = "([^"]+)"', chunk)
-            posx_m = re.search(r'"posx"\] = ([\-\d.]+)', chunk)
-            posz_m = re.search(r'"posz"\] = ([\-\d.]+)', chunk)
-            scene_matches = list(re.finditer(r'\[(\d{4,5})\] = \{', text[:idx]))
+            posx_m = re.search(r'"posx"\]\s*=\s*([\-\d.eE+]+)', chunk)
+            posz_m = re.search(r'"posz"\]\s*=\s*([\-\d.eE+]+)', chunk)
+            # Find the enclosing scene block by looking for [SCENE_ID] = {
+            scene_matches = list(re.finditer(r'\[(\d{4,5})\]\s*=\s*\{', text[:idx]))
 
             scene_id = int(scene_matches[-1].group(1)) if scene_matches else 0
             npc_name = name_m.group(1) if name_m else "?"

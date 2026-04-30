@@ -31,12 +31,16 @@ This is a **macOS Python automation bot** for the mobile/desktop game **RöX** (
 | `capture.py` | Captures the RöX window via macOS Quartz (`CGWindowListCreateImage`). Returns a **logical-resolution** PIL Image (1× not 2×). |
 | `ocr.py` | **Apple Vision OCR engine** (`VNRecognizeTextRequest`). ~190ms/scan, replaces EasyOCR. Returns `list[TextRegion]`. |
 | `recognizer.py` | OpenCV `TM_CCOEFF_NORMED` template matching (icon/button detection). |
-| `quests.py` | Quest automation: 4-step state machine — pathfinding wait → dialog advance → interaction/action button → quest row click. |
-| `actions.py` | Mouse/keyboard actions via `pyautogui`. Translates window-relative coords to screen coords. |
-| `ui_dashboard.py` | Tkinter floating overlay showing live status, action log, stats, Pause/Stop. |
-| `calibrate.py` | **Run this on the live machine only.** Captures window, annotates every match, saves `debug_calibration.png`. |
+| `quests.py` | Quest automation: 5-step state machine — pathfinding idle → dialog advance → interaction → smart action buttons → quest row click. |
+| `actions.py` | Mouse actions via **macOS Quartz CGEvents** (does NOT move the physical cursor). Keyboard via `pyautogui`. |
+| `ui_dashboard.py` | Tkinter floating overlay: always-on-top, compact layout, task checklist (Quests, Daily Rewards, Auto-Potion, Party Accept, Farming). |
+| `game_knowledge.py` | **Offline** game-data knowledge base parsed from `bundle_dumps/` text files. 1914 scene NPCs, 4215 static NPCs, 1890 recurring quests, 6 world tasks. No heavy deps. |
+| `log_monitor.py` | Real-time Unity `Player.log` tail monitor. Detects scene changes, quest updates, pathfinding events, NPC interactions. Runs on a daemon thread. |
+| `game_data.py` | Static game-data tables parsed from Unity AssetBundles via UnityPy (live machine). Provides entrust NPC world positions and recurring quest task keys. |
+| `bundle_explorer.py` | **Run on live machine.** Extracts all Lua TextAsset data from AssetBundles → `bundle_dumps/`. |
+| `calibrate.py` | **Run on live machine only.** Captures window, annotates every match, saves `debug_calibration.png`. |
 | `save_template.py` | Captures the RöX window to `templates/<name>.png` for cropping new templates. Run on live machine. |
-| `game_data.py` | Static game-data tables parsed from Unity AssetBundles. Provides entrust NPC world positions and recurring quest task keys. |
+| `bundle_dumps/` | Pre-extracted game data text files (NPC positions, quests, waypoints). Committed to git for offline analysis. |
 | `templates/` | PNG reference images used for template matching. |
 | `ocr_easyocr_backup.py` | Old EasyOCR implementation, kept for reference. Do not use. |
 
@@ -234,6 +238,67 @@ Frida is blocked: app lacks `get-task-allow` entitlement, production-signed (`2Y
 
 ### Accessibility API — USELESS
 The game renders via Metal canvas. `AXUIElement` only exposes `AXGroup`/`AXButton` with no text content. Use `ocr.py` for all text detection.
+
+---
+
+## Game integration strategy
+
+Since runtime injection (Frida) is blocked and the Accessibility API is useless for this Unity game, we use **three complementary approaches** to get game data:
+
+### 1. Offline knowledge base — `game_knowledge.py`
+```python
+from game_knowledge import load, ALL_SCENE_NPCS, RECURRING_QUESTS, npcs_in_scene
+load()   # ~0.2 s, reads bundle_dumps/*.txt only — no heavy deps
+
+# 1914 NPCs with 3D world coordinates
+npc = ALL_SCENE_NPCS[10101013]  # SceneNPC(unique_id=10101013, scene_id=1010, x=-8.57, z=-31.46, name='委托板')
+
+# 1890 recurring quest task definitions
+q = RECURRING_QUESTS[30101]     # RecurringQuest(quest_id=30101, target_type=74, times=50, ...)
+
+# All NPCs in Prontera
+prontera_npcs = npcs_in_scene(1010)  # list of SceneNPC
+```
+- Parses `bundle_dumps/` text files (committed to git from the live machine)
+- No UnityPy needed — works offline on any machine
+- Provides: NPC positions, quest definitions, world tasks, NPC dialogue IDs
+
+### 2. Real-time log monitor — `log_monitor.py`
+```python
+from log_monitor import LogMonitor
+monitor = LogMonitor()
+monitor.start()  # daemon thread tails Player.log
+
+# In automation loop:
+for event in monitor.drain_events():
+    if event.kind == "scene_change":
+        new_scene = int(event.data["scene_id"])
+    elif event.kind == "quest_complete":
+        ...
+
+# Or check accumulated state:
+if monitor.current_scene == 1010:  # Prontera
+    ...
+if monitor.is_pathfinding:  # avoid clicking
+    ...
+```
+- Tails Unity's `Player.log` in real-time
+- Detects: scene changes, quest updates, NPC interactions, pathfinding start/end, errors
+- Patterns are estimates — **must be calibrated on live machine** by examining actual log output
+- Run `python log_monitor.py` on the live machine to see raw log events
+
+### 3. Live machine calibration tasks
+When on the live machine, run these to discover actual log patterns:
+```bash
+# Watch the log in real-time while playing
+python log_monitor.py
+
+# Re-extract bundle data after game updates
+python bundle_explorer.py
+
+# Examine actual Player.log location and contents
+tail -f ~/Library/Containers/com.play.rosea/Data/Library/Logs/Unity/Player.log
+```
 
 ---
 
