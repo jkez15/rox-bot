@@ -1,7 +1,25 @@
 # RöX Automation Bot — Copilot Instructions
 
+## Two-machine workflow
+
+This project is developed across **two machines**:
+
+| Machine | Role |
+|---|---|
+| **Mac with RöX** | Live testing, OCR calibration, template capture, bug diagnosis. All screen captures, clicks, and OCR runs happen here. |
+| **Other machine (no RöX)** | Architecture, AI/ML solutions, complex logic, code review, new modules. Cannot run the bot — but can read, analyse, and write all code. |
+
+### Rules for the other machine
+- **Never run `main.py`, `calibrate.py`, `capture.py`, or anything that requires the game window.** These will fail silently or hang.
+- **Do write** new modules, improve algorithms, add logic, refactor, and propose solutions.
+- When you need to verify screen geometry or OCR output, look at the `debug_*.png` files committed to the repo — they are real annotated captures from the live machine.
+- All coordinate constants are in `quests.py` (`HUD_TOP_Y_MAX`, `GAME_WORLD_Y_MAX`, etc.). Use these when reasoning about screen layout.
+- The live machine will test and diagnose; the other machine builds the solutions.
+
+---
+
 ## Project purpose
-This is a **macOS Python automation bot** for the mobile/desktop game **RöX** (process name `RX`, Quartz window owner `Ro\u0308X` — NFD-encoded umlaut). The bot detects the running game, captures its window, performs image-based template matching to locate UI elements, and sends mouse clicks to automate quests and other repetitive tasks.
+This is a **macOS Python automation bot** for the mobile/desktop game **RöX** (process name `RX`, Quartz window owner `Ro\u0308X` — NFD-encoded umlaut). The bot detects the running game, captures its window, performs Apple Vision OCR + OpenCV template matching to locate UI elements, and sends mouse clicks to automate quests and other repetitive tasks.
 
 ## Project structure
 
@@ -11,50 +29,119 @@ This is a **macOS Python automation bot** for the mobile/desktop game **RöX** (
 | `config.py` | All tunable constants (process name, thresholds, intervals). |
 | `detector.py` | Uses `psutil` to check whether RöX is running. |
 | `capture.py` | Captures the RöX window via macOS Quartz (`CGWindowListCreateImage`). Returns a **logical-resolution** PIL Image (1× not 2×). |
-| `recognizer.py` | OpenCV `TM_CCOEFF_NORMED` template matching. |
+| `ocr.py` | **Apple Vision OCR engine** (`VNRecognizeTextRequest`). ~190ms/scan, replaces EasyOCR. Returns `list[TextRegion]`. |
+| `recognizer.py` | OpenCV `TM_CCOEFF_NORMED` template matching (icon/button detection). |
 | `quests.py` | Quest automation: 4-step state machine — pathfinding wait → dialog advance → interaction/action button → quest row click. |
 | `actions.py` | Mouse/keyboard actions via `pyautogui`. Translates window-relative coords to screen coords. |
 | `ui_dashboard.py` | Tkinter floating overlay showing live status, action log, stats, Pause/Stop. |
-| `calibrate.py` | **Run this first.** Visual self-test tool — captures the window, annotates every match, saves `debug_calibration.png`, reports pass/fail. |
-| `save_template.py` | Helper to screenshot the RöX window for cropping new templates. |
-| `game_data.py` | Static game-data tables parsed from Unity AssetBundles. Provides entrust NPC world positions and recurring quest task keys. Call `game_data.load_all()` once at startup. |
+| `calibrate.py` | **Run this on the live machine only.** Captures window, annotates every match, saves `debug_calibration.png`. |
+| `save_template.py` | Captures the RöX window to `templates/<name>.png` for cropping new templates. Run on live machine. |
+| `game_data.py` | Static game-data tables parsed from Unity AssetBundles. Provides entrust NPC world positions and recurring quest task keys. |
 | `templates/` | PNG reference images used for template matching. |
+| `ocr_easyocr_backup.py` | Old EasyOCR implementation, kept for reference. Do not use. |
+
+---
+
+## Screen layout (1051 × 816 logical pixels)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  y < 300    TOP HUD: HP/SP bars, minimap, Backpack, Leave dungeon btn   │
+├────────┬────────────────────────────────────────────────────────────────┤
+│        │                                                                │
+│ QUEST  │           GAME WORLD  (300 ≤ y < 620)                         │
+│ PANEL  │    NPC buttons, action buttons, dialog choice buttons          │
+│ x<260  │                                                                │
+│        ├────────────────────────────────────────────────────────────────┤
+│        │  DIALOG / CHAT ZONE  (620 ≤ y < 770) — never clicked          │
+├────────┴────────────────────────────────────────────────────────────────┤
+│  y ≥ 770    BOTTOM HUD: level bar, chat input                           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+Key constants in `quests.py`:
+```python
+QUEST_PANEL_X_MAX = 260   # sidebar right edge
+HUD_TOP_Y_MAX     = 300   # top HUD bottom edge
+GAME_WORLD_Y_MAX  = 620   # game world bottom edge
+DIALOG_TEXT_Y_MIN = 620   # chat/dialog zone starts
+DIALOG_TEXT_Y_MAX = 770   # chat/dialog zone ends
+```
+
+---
+
+## OCR engine — Apple Vision (`ocr.py`)
+
+```python
+from ocr import read_window, find_text, find_all_text
+
+regions = read_window(screenshot, min_conf=0.30)
+# returns list[TextRegion(text, x, y, w, h, conf, cx, cy)]
+
+r = find_text(regions, r"\[Main\]", min_conf=0.40)
+# returns first TextRegion matching the regex, or None
+```
+
+- Uses `VNRecognizeTextRequest` via `pyobjc` — **no model download, no GPU**
+- `usesLanguageCorrection = False` — preserves exact game text like `[Main]`
+- Vision coord system is bottom-left origin; `ocr.py` flips to top-left before returning
+- Confidence is typically 0.9–1.0 for clean game UI text; 0.5–0.8 for styled buttons
+
+---
+
+## Quest automation state machine (`quests.py`)
+
+Each call to `do_quest_scan()` runs one full cycle:
+
+```
+Step 0  Pathfinding active?  →  wait, no click
+Step 1  Explicit dialog button (Skip/Inquire/Next/Close/OK…)?  →  click it
+Step 2  Examine/Inspect/Talk button in game world?  →  click icon above label
+Step 3  Any action button (Show/Collect/Use/Activate/Enter…) in game world?  →  click
+Step 4  [Main] quest row in sidebar?  →  click to set navigation target
+```
+
+The chat/dialog zone (`y > 620`) is **never clicked**. All detection is button-first — no text-zone spam-clicking.
+
+---
 
 ## Critical rules — always follow these
 
 ### 1. Coordinates are always LOGICAL (1× not Retina 2×)
-`capture.py` resizes the captured image back to logical size (`bounds["Width"] × bounds["Height"]`). Template match results `(cx, cy)` are therefore directly usable as `click(cx, cy, bounds)` arguments. **Never multiply or divide by 2.**
+`capture.py` resizes the captured image back to logical size. Template match results `(cx, cy)` are directly usable as `click(cx, cy, bounds)` arguments. **Never multiply or divide by 2.**
 
-### 2. Click targets must come from template matches, not hardcoded pixels
-The `click(cx, cy, bounds)` call in `quests.py` (and any future automation file) must use the `(cx, cy)` returned by `find_template(...)`. Hardcoded pixel offsets become wrong whenever the window moves or resizes. Relative-fraction fallbacks (`bounds["Width"] * 0.xx`) are acceptable only as a last resort.
+### 2. Click targets must come from OCR/template matches, not hardcoded pixels
+Use `find_text(regions, pattern)` or `find_template(screenshot, "name.png")`. Hardcoded pixel offsets break when the window moves or resizes.
 
-### 3. Always run calibrate.py after changing templates or adding new automation
-`calibrate.py` is the source of truth for whether click targets are correct. It opens an annotated PNG showing every click target overlaid on the live screenshot. If a circle is in the wrong place, fix the template crop — not the code coordinates.
+### 3. Always run calibrate.py (on live machine) after changing templates
+`calibrate.py` saves `debug_calibration.png` — an annotated screenshot showing every click target. Check this file in the repo to verify positions.
 
 ### 4. Template matching threshold guidance
 - **0.85+** — exact pixel match (same game session, no UI animation)
-- **0.70–0.84** — recommended default; handles slight rendering differences
-- **0.55–0.69** — use only for presence detection (not as a click target)
-- **< 0.55** — unreliable; recrop the template instead of lowering the threshold
+- **0.70–0.84** — recommended default
+- **0.55–0.69** — presence detection only (not a click target)
+- **< 0.55** — unreliable; recrop the template
 
 ### 5. The window name has a Unicode NFD umlaut
-`APP_WINDOW_NAME = "Ro\u0308X"` (o + combining umlaut U+0308, NOT the precomposed ö U+00F6). `capture.py` normalises both sides with `unicodedata.normalize("NFC", ...)` before comparing. Do not change this without also updating the comparison logic.
+`APP_WINDOW_NAME = "Ro\u0308X"` (o + combining umlaut U+0308, NOT ö U+00F6). Do not change without updating `capture.py` comparison logic.
 
 ### 6. Virtual environment
-All dependencies live in `.venv/`. Always use `.venv/bin/python` or activate with `source .venv/bin/activate`. The project also has a `venv/` folder — do not use it.
+All dependencies live in `.venv/`. Always use `.venv/bin/python`. Do not use the `venv/` folder.
 
 ### 7. Thread safety
-`ui_dashboard.py` runs Tkinter on the **main thread**. The automation loop runs on a **daemon thread**. All cross-thread communication goes through `Dashboard` methods which use `threading.Lock`. Never call Tkinter widget methods from the worker thread.
+Tkinter runs on the **main thread**. Automation runs on a **daemon thread**. All cross-thread communication goes through `Dashboard` methods with `threading.Lock`. Never call Tkinter widget methods from the worker thread.
+
+---
 
 ## Adding a new automation task (step-by-step)
 
-1. **Capture a template**
+1. **Capture a template** (live machine):
    ```bash
    python save_template.py my_button_name
    ```
-2. **Crop it** — Open `templates/my_button_name.png` in Preview → Tools → Adjust Size / Crop. Crop tightly around just the button. Save.
+2. **Crop it** — Open `templates/my_button_name.png` in Preview → Rectangular Selection → ⌘K Crop → ⌘S Save. Crop tightly around just the button.
 
-3. **Register it in `calibrate.py`** — Add an entry to `TARGETS`:
+3. **Register it in `calibrate.py`**:
    ```python
    {
        "name":      "My Button",
@@ -65,27 +152,42 @@ All dependencies live in `.venv/`. Always use `.venv/bin/python` or activate wit
    }
    ```
 
-4. **Run calibration** and verify the circle lands on the correct element:
+4. **Run calibration** (live machine):
    ```bash
    python calibrate.py
+   # inspect debug_calibration.png to verify the circle is on the right element
    ```
 
-5. **Write the automation** in the appropriate module (or a new `my_feature.py`):
+5. **Write the automation**:
    ```python
+   # OCR approach (text labels)
+   r = find_text(regions, r"\bMyLabel\b", min_conf=0.50)
+   if r and r.cx > QUEST_PANEL_X_MAX and r.cy < GAME_WORLD_Y_MAX:
+       click(r.cx, r.cy, bounds)
+
+   # Template approach (icons with no text)
    match = find_template(screenshot, "my_button_name.png", threshold=0.75)
    if match:
        cx, cy, conf = match
        click(cx, cy, bounds)
    ```
 
-6. **Wire it into `main.py`** inside `automation_loop()`.
+6. **Wire into `do_quest_scan()`** in `quests.py` at the appropriate step priority.
 
-## Planned future automation
-- [ ] Auto-collect daily quest rewards
-- [ ] Auto-talk to NPCs when distance reaches 0 m
-- [ ] Auto-enter dungeons / boss fights
-- [ ] HP/SP potion auto-use when bars drop below threshold
-- [ ] Party auto-accept
+---
+
+## Planned future automation (build these on the other machine)
+
+- [ ] **HP/SP potion auto-use** — detect HP/SP bar fill level via template matching on the bar region; click potion hotkey when below threshold. Bar region: approx `(0–260, 0–60)`.
+- [ ] **Auto-collect daily quest rewards** — detect reward popup (template: golden chest icon); click Collect button.
+- [ ] **Auto-talk to NPCs when distance = 0 m** — parse "Distance to target: 0 m" from OCR; trigger Examine interaction immediately.
+- [ ] **Auto-enter dungeons / boss fights** — detect dungeon entry prompt template; click Enter/Challenge.
+- [ ] **Party auto-accept** — detect party invite popup; click Accept.
+- [ ] **Recurring quest board automation** — use `game_data.RECURRING_QUEST_TASK_DESC` (1701 tasks) to identify and complete recurring quests from the commission board.
+- [ ] **Scene-aware navigation** — use `game_data.ENTRUST_NPC_WORLD_POS` (12 NPCs with Unity world coords) to build scene-specific routing logic.
+- [ ] **Vision-based HP bar reader** — crop HP bar pixel row, measure red/green ratio for exact HP% without template matching.
+
+---
 
 ## Game engine internals (research notes)
 
@@ -111,10 +213,9 @@ All static game data is stored as **Lua TextAsset** scripts inside 10,946 Unity 
 | `e957292c18f4bfd36c5770ed1496e812` | UI prefabs + compiled Lua bytecode: `debug_en_translate`, `debug_en_kvReversal` (English localization — **bytecode, not readable**) |
 
 ### Localization
-English, Thai, Vietnamese localization scripts are **compiled Lua 5.3 bytecode** — not plain text.  Do NOT attempt to parse them as text.  NPC display names in `data_npc_SceneNPC` are Chinese developer names (e.g. `委托板` = "Commission Board") or localization keys (e.g. `NpcName61001`).
+English localization scripts are **compiled Lua 5.3 bytecode** — not plain text. NPC display names in `data_npc_SceneNPC` are Chinese developer names (e.g. `委托板` = "Commission Board") or localization keys (e.g. `NpcName61001`).
 
 ### game_data.py
-`game_data.py` wraps bundle access via `UnityPy`:
 ```python
 from game_data import load_all, ENTRUST_NPC_WORLD_POS, RECURRING_QUEST_TASK_DESC
 load_all()   # ~0.8 s, call once at startup
@@ -122,20 +223,23 @@ pos = ENTRUST_NPC_WORLD_POS[10101013]  # WorldPos(x=-8.57, z=-31.46, scene_id=10
 ```
 - `ENTRUST_NPC_WORLD_POS` — 12 quest-board NPCs with Unity world (x, z) coords
 - `RECURRING_QUEST_TASK_DESC` — 1701 recurring quest task localization keys
-- Scene IDs encode zones: `1010`=Prontera, `1110`=Izlude, `1210`=Geffen area, `1310`, `1410`, etc.
+- Scene IDs: `1010`=Prontera, `1110`=Izlude, `1210`=Geffen, `1310`, `1410`, etc.
 - NPC uniqueId first-4-digits = scene_id: `10101013 → scene 1010`
 
 ### Assembly
-`/Applications/RöX.app/Wrapper/RX.app/Data/Raw/Assembly-CSharp.dll.bytes` is a readable MZ/.NET DLL (HybridCLR).  3,886 types.  Key namespaces: `Dream.Data` (TaskModel, NPCModel), `Dream.Game.AutoPathing`, `Dream.Game.Com.RoleMoveComponent`, `Cc.Thedream.Mmo.Protocal.Task`, `XLua.CSObjectWrap.*`.
+`/Applications/RöX.app/Wrapper/RX.app/Data/Raw/Assembly-CSharp.dll.bytes` is a readable MZ/.NET DLL (HybridCLR). 3,886 types. Key namespaces: `Dream.Data` (TaskModel, NPCModel), `Dream.Game.AutoPathing`, `Dream.Game.Com.RoleMoveComponent`, `Cc.Thedream.Mmo.Protocal.Task`.
 
 ### Runtime injection — BLOCKED
-Frida is blocked: app lacks `get-task-allow` entitlement, production-signed (`2Y3ZW5J4A7.com.play.rosea`).  `frida.PermissionDeniedError` will be thrown.  Do not attempt Frida injection.
+Frida is blocked: app lacks `get-task-allow` entitlement, production-signed (`2Y3ZW5J4A7.com.play.rosea`). `frida.PermissionDeniedError` will be thrown. Do not attempt Frida injection or cheat-engine approaches.
 
 ### Accessibility API — USELESS
-The game renders via Metal canvas.  `AXUIElement` only exposes `AXGroup`/`AXButton` with no text content.  Use OCR (`ocr.py`) for all text detection.
+The game renders via Metal canvas. `AXUIElement` only exposes `AXGroup`/`AXButton` with no text content. Use `ocr.py` for all text detection.
 
-## macOS permissions required
-- **Screen Recording** — System Settings → Privacy & Security → Screen Recording → Terminal (or Python)
+---
+
+## macOS permissions required (live machine only)
+- **Screen Recording** — System Settings → Privacy & Security → Screen Recording → Terminal
 - **Accessibility** — Same location → Accessibility → Terminal (for `pyautogui` mouse control)
 
-These must be granted manually once. If capture returns a black image or clicks don't register, check these permissions first.
+If capture returns a black image or clicks don't register, check these permissions first.
+
