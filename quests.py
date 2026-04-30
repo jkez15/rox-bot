@@ -175,6 +175,11 @@ DIALOG_CHOICE_PATTERNS = [
 # Was 650 — lowered to 400 so buttons slightly right of centre are not missed.
 DIALOG_CHOICE_X_MIN = 400   # logical pixels
 
+# Dialog choice buttons can only appear in the MIDDLE portion of the screen.
+# The top ~300px is occupied by permanent HUD elements (Leave dungeon, Backpack,
+# minimap, HP/SP bars) that must NEVER be clicked as dialog choices.
+DIALOG_CHOICE_Y_MIN = 300   # logical pixels — ignore anything above this
+
 # NPC dialog is considered open when speech text appears near the bottom.
 # Y range is bounded to exclude world chat (y > DIALOG_TEXT_Y_MAX).
 DIALOG_TEXT_Y_MIN = 620   # logical pixels — above world chat
@@ -233,10 +238,10 @@ def _find_dialog_button(regions, bounds_w: int = 1051):
     if skip_r and skip_r.cx > QUEST_PANEL_X_MAX:
         return skip_r.cx, skip_r.cy, skip_r.text, "skip"
 
-    # 2. Right-side choice buttons (cx > DIALOG_CHOICE_X_MIN)
+    # 2. Right-side choice buttons (cx > DIALOG_CHOICE_X_MIN, y > DIALOG_CHOICE_Y_MIN)
     for pattern in DIALOG_CHOICE_PATTERNS:
         r = find_text(regions, pattern, min_conf=MIN_CONF_DIALOG)
-        if r and r.cx > DIALOG_CHOICE_X_MIN:
+        if r and r.cx > DIALOG_CHOICE_X_MIN and r.cy > DIALOG_CHOICE_Y_MIN:
             return r.cx, r.cy, r.text, "choice"
 
     # 3. Spam-click fallback — only when actual NPC speech is present.
