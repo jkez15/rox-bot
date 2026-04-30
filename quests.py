@@ -51,9 +51,9 @@ PATHFINDING_PATTERN = r"Pathfinding|Path\s*finding|Auto.?walk"
 MIN_CONF_PATHFINDING = 0.30
 
 # Quest types in strict priority order — first match wins.
+# Only [Main] quests are pursued; all other quest types are ignored.
 QUEST_PRIORITY: list[tuple[str, str]] = [
-    (r"\[Main\]",     "Main"),
-    (r"\[Tutorial\]", "Tutorial"),
+    (r"\[Main\]", "Main"),
 ]
 
 # Button labels that open NPC interaction (Examine screen).
@@ -152,17 +152,28 @@ SKIP_PATTERN = r"\bSkip\b"
 # Choice / advance buttons on the RIGHT side of the screen (cx > DIALOG_CHOICE_X_MIN).
 # These appear when the dialog offers selectable options with no Skip available.
 DIALOG_CHOICE_PATTERNS = [
-    r"Inquir",      # 'Inquire' — closes/completes quest conversation
-    r"\bNext\b",    # advance dialogue line
-    r"Continu",     # 'Continue'
-    r"\bClose\b",   # dismiss after quest update
+    r"Inquir",          # 'Inquire' — closes/completes quest conversation
+    r"\bNext\b",        # advance dialogue line
+    r"Continu",         # 'Continue'
+    r"\bClose\b",       # dismiss after quest update
     r"\bOk\b",
+    r"\bOK\b",
     r"\bYes\b",
     r"\bAgree\b",
+    r"Got\s*it",        # 'Got it' confirmation
+    r"Understood",      # acknowledgement
+    r"I\s*see",         # 'I see'
+    r"\bConfirm\b",
+    r"\bDone\b",
+    r"\bFinish\b",
+    r"\bLeave\b",       # leave dialog
+    r"\bBye\b",
+    r"\bThanks\b",
 ]
 
-# Right-side choices have cx above this threshold (right portion of screen).
-DIALOG_CHOICE_X_MIN = 650   # logical pixels
+# Right-side choices: any button right of screen centre counts.
+# Was 650 — lowered to 400 so buttons slightly right of centre are not missed.
+DIALOG_CHOICE_X_MIN = 400   # logical pixels
 
 # NPC dialog is considered open when speech text appears near the bottom.
 # Y range is bounded to exclude world chat (y > DIALOG_TEXT_Y_MAX).
@@ -231,18 +242,23 @@ def _find_dialog_button(regions, bounds_w: int = 1051):
     # 3. Spam-click fallback — only when actual NPC speech is present.
     # Require multi-word text in the speech zone that doesn't look like
     # recruit/party-chat (which always contains "Lv." level numbers).
-    has_npc_speech = any(
-        DIALOG_TEXT_Y_MIN < r.cy < DIALOG_TEXT_Y_MAX
-        and r.cx > QUEST_PANEL_X_MAX
-        and r.conf >= 0.60
-        and len(r.text.split()) >= 4        # real NPC speech is a sentence
-        and "Lv." not in r.text             # exclude party/recruit chat
-        and "Recruit" not in r.text
-        and "World" not in r.text
-        for r in regions
-    )
-    if has_npc_speech:
-        return DIALOG_SPAM_X, DIALOG_SPAM_Y, "screen", "spam"
+    # Click on the detected speech text's position so the tap lands on the
+    # dialog box itself rather than a fixed screen centre.
+    speech_region = None
+    for r in regions:
+        if (
+            DIALOG_TEXT_Y_MIN < r.cy < DIALOG_TEXT_Y_MAX
+            and r.conf >= 0.60
+            and len(r.text.split()) >= 4        # real NPC speech is a sentence
+            and "Lv." not in r.text             # exclude party/recruit chat
+            and "Recruit" not in r.text
+            and "World" not in r.text
+        ):
+            speech_region = r
+            break
+    if speech_region:
+        # Click the detected speech text position (dialogue box area)
+        return speech_region.cx, speech_region.cy, speech_region.text[:40], "spam"
 
     return None
 
@@ -333,7 +349,7 @@ def do_quest_scan(
         else:
             status_cb(f"💬 Dialog — no button found, clicking centre ({dx}, {dy})")
         click(dx, dy, bounds)
-        time.sleep(0.5)
+        time.sleep(0.8)   # wait for dialog animation / text scroll
         # Dialog handled — fall through to quest navigation below so the
         # bot immediately picks up the next quest once the dialog clears.
 

@@ -12,11 +12,12 @@ This is a **macOS Python automation bot** for the mobile/desktop game **RöX** (
 | `detector.py` | Uses `psutil` to check whether RöX is running. |
 | `capture.py` | Captures the RöX window via macOS Quartz (`CGWindowListCreateImage`). Returns a **logical-resolution** PIL Image (1× not 2×). |
 | `recognizer.py` | OpenCV `TM_CCOEFF_NORMED` template matching. |
-| `quests.py` | Quest automation: detects quest panel → clicks the top quest row. |
+| `quests.py` | Quest automation: 4-step state machine — pathfinding wait → dialog advance → interaction/action button → quest row click. |
 | `actions.py` | Mouse/keyboard actions via `pyautogui`. Translates window-relative coords to screen coords. |
 | `ui_dashboard.py` | Tkinter floating overlay showing live status, action log, stats, Pause/Stop. |
 | `calibrate.py` | **Run this first.** Visual self-test tool — captures the window, annotates every match, saves `debug_calibration.png`, reports pass/fail. |
 | `save_template.py` | Helper to screenshot the RöX window for cropping new templates. |
+| `game_data.py` | Static game-data tables parsed from Unity AssetBundles. Provides entrust NPC world positions and recurring quest task keys. Call `game_data.load_all()` once at startup. |
 | `templates/` | PNG reference images used for template matching. |
 
 ## Critical rules — always follow these
@@ -85,6 +86,53 @@ All dependencies live in `.venv/`. Always use `.venv/bin/python` or activate wit
 - [ ] Auto-enter dungeons / boss fights
 - [ ] HP/SP potion auto-use when bars drop below threshold
 - [ ] Party auto-accept
+
+## Game engine internals (research notes)
+
+### Engine stack
+- **Unity 2019.4.41f1** with **HybridCLR** (hot-reload C# IL) + **XLua** scripting
+- iOS app running via macOS Catalyst wrapper: `RöX.app/Wrapper/RX.app`
+- App container: `~/Library/Containers/com.play.rosea/Data/`
+
+### Unity AssetBundles
+All static game data is stored as **Lua TextAsset** scripts inside 10,946 Unity AssetBundles:
+```
+~/Library/Containers/com.play.rosea/Data/Documents/Bundle/
+```
+
+**Key bundle hashes** (stable, content-addressed):
+
+| Bundle hash | Contents |
+|---|---|
+| `3646f446a33a9b6da50004fc89dc8ed8` | NPC tables: `data_npc_NPC`, `data_npc_SceneNPC` (1.3 MB, all NPC world positions), `data_npc_DynamicNPC`, `data_DynamicNPCInfo` |
+| `29e911ea58189fd5aa06f4ed04bea33f` | Entrust/commission quests: `data_entrust_QuestBoard`, `data_entrust_LoversQuestPool`, `data_entrust_QuestSpecialPool` |
+| `552ed40e494471c121f4ccb67005eac8` | 417 Lua scripts — `data_RecurringQuest_RecurringQuest` (923 KB, 1701 tasks), WorldTask, RamadanQuest, WonderWorld |
+| `e8bf32a6421ee05bc02c146520e1874c` | Route waypoints (`posx/posy/posz`), BattlePass, SevenDayQuest |
+| `e957292c18f4bfd36c5770ed1496e812` | UI prefabs + compiled Lua bytecode: `debug_en_translate`, `debug_en_kvReversal` (English localization — **bytecode, not readable**) |
+
+### Localization
+English, Thai, Vietnamese localization scripts are **compiled Lua 5.3 bytecode** — not plain text.  Do NOT attempt to parse them as text.  NPC display names in `data_npc_SceneNPC` are Chinese developer names (e.g. `委托板` = "Commission Board") or localization keys (e.g. `NpcName61001`).
+
+### game_data.py
+`game_data.py` wraps bundle access via `UnityPy`:
+```python
+from game_data import load_all, ENTRUST_NPC_WORLD_POS, RECURRING_QUEST_TASK_DESC
+load_all()   # ~0.8 s, call once at startup
+pos = ENTRUST_NPC_WORLD_POS[10101013]  # WorldPos(x=-8.57, z=-31.46, scene_id=1010, name='委托板')
+```
+- `ENTRUST_NPC_WORLD_POS` — 12 quest-board NPCs with Unity world (x, z) coords
+- `RECURRING_QUEST_TASK_DESC` — 1701 recurring quest task localization keys
+- Scene IDs encode zones: `1010`=Prontera, `1110`=Izlude, `1210`=Geffen area, `1310`, `1410`, etc.
+- NPC uniqueId first-4-digits = scene_id: `10101013 → scene 1010`
+
+### Assembly
+`/Applications/RöX.app/Wrapper/RX.app/Data/Raw/Assembly-CSharp.dll.bytes` is a readable MZ/.NET DLL (HybridCLR).  3,886 types.  Key namespaces: `Dream.Data` (TaskModel, NPCModel), `Dream.Game.AutoPathing`, `Dream.Game.Com.RoleMoveComponent`, `Cc.Thedream.Mmo.Protocal.Task`, `XLua.CSObjectWrap.*`.
+
+### Runtime injection — BLOCKED
+Frida is blocked: app lacks `get-task-allow` entitlement, production-signed (`2Y3ZW5J4A7.com.play.rosea`).  `frida.PermissionDeniedError` will be thrown.  Do not attempt Frida injection.
+
+### Accessibility API — USELESS
+The game renders via Metal canvas.  `AXUIElement` only exposes `AXGroup`/`AXButton` with no text content.  Use OCR (`ocr.py`) for all text detection.
 
 ## macOS permissions required
 - **Screen Recording** — System Settings → Privacy & Security → Screen Recording → Terminal (or Python)
