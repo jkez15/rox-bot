@@ -1,94 +1,119 @@
 """
-quests.py – Quest automation for RöX using Apple Vision OCR.
+quests.py – Self-directing quest automation for RöX.
 
-Quest cycle (priority-ordered state machine per scan)
------------------------------------------------------
-  Step 0 — PATHFINDING IDLE (highest priority)
-    Character is auto-walking.  Do nothing until 'Pathfinding' text clears.
+How it works
+------------
+Each call to do_quest_scan() runs one full OCR cycle and acts.
 
-  Step 1 — DIALOG ADVANCEMENT
-    Requires an explicit button (Skip / Inquire / Next / Continue / OK…).
-    The chat/dialog zone (y > 620) is never clicked directly.
+The engine reads the quest sidebar on every scan to extract:
+  • Quest title    — "[Main] All Must be Found!"
+  • Step text      — "Head to behind the cathedral."  (multi-line, merged)
+  • Distance       — "118 m"
+  • Target         — "Prontera"
 
-  Step 2 — INTERACTION CHECK
-    'Examine' / 'Inspect' button in the game world → click the icon above it.
+It classifies the step type (NAVIGATE / TALK / EXAMINE / COLLECT /
+COMBAT / DELIVER / ENTER / USE / PHOTO) and chooses the right action.
+All observations and click actions are persisted to quest_progress.db
+so the bot can detect stalls and build a full quest walkthrough over time.
 
-  Step 3 — SMART ACTION BUTTONS
-    Any interactive button in the game-world zone (outside quest panel,
-    above dialog zone).
+Priority order each scan
+------------------------
+  0  PATHFINDING ACTIVE  →  wait, no click
+  1  DIALOG / SKIP       →  click the button (or tap-to-advance)
+  2  INTERACTION         →  Examine / Talk / Inspect button visible
+  3  ACTION BUTTON       →  Use / Collect / Enter / etc. in game world
+  4  QUEST NAVIGATION    →  (re)click [Main] row to set nav target
+  5  STALL RECOVERY      →  if stuck N cycles, try alternative approach
 
-  Step 4 — QUEST NAVIGATION (lowest priority)
-    Click the [Main] quest row to set it as the active navigation target.
-
-Screen layout (1051 × 816 logical pixels)
-------------------------------------------
-  x < 260            → quest sidebar
-  y < 300            → top HUD  (HP/SP bars, minimap, Backpack, Leave)
-  300 ≤ y < 620       → game world (NPC buttons, action buttons, dialogs)
-  620 ≤ y < 770       → dialog / chat zone
-  y ≥ 770            → bottom HUD (level bar, chat input)
+Screen layout  (1051 × 816 logical px)
+---------------------------------------
+  x <  260            quest sidebar
+  y <  300            top HUD  (HP/SP bars, minimap, Backpack)
+  300 ≤ y < 620       game world  (NPCs, action buttons, dialogs)
+  620 ≤ y < 770       dialog / chat zone
+  y ≥  770            bottom HUD
 """
 
 from __future__ import annotations
 
 import re
 import time
-from typing import Callable
+from typing import Callable, Optional
 
 from capture import capture_window
 from ocr import read_window, find_text, find_all_text
 from log_monitor import tracker as _state_tracker
 from actions import click
+from quest_db import db as _db, classify_step
 
-
-# ── Screen geometry ──────────────────────────────────────────────────────────
-
-# Anything left of this x is inside the quest-panel sidebar.
+# ── Screen geometry ───────────────────────────────────────────────────────────
 QUEST_PANEL_X_MAX = 260
-
-# Top HUD boundary: HP/SP, minimap, Backpack, Leave dungeon button.
-# Nothing above this y can ever be a dialog choice or action button.
-HUD_TOP_Y_MAX = 300
-
-# Bottom of the game-world area.  Below this is the dialog/chat zone.
-GAME_WORLD_Y_MAX = 620
-
-# Dialog / NPC speech zone.
-DIALOG_TEXT_Y_MIN = GAME_WORLD_Y_MAX      # 620
+HUD_TOP_Y_MAX     = 300
+GAME_WORLD_Y_MAX  = 620
+DIALOG_TEXT_Y_MIN = GAME_WORLD_Y_MAX   # 620
 DIALOG_TEXT_Y_MAX = 770
 
-
-# ── Pathfinding detection ────────────────────────────────────────────────────
-PATHFINDING_PATTERN = r"Pathfinding|Path\s*finding|Auto.?walk"
+# ── Confidence thresholds ─────────────────────────────────────────────────────
 MIN_CONF_PATHFINDING = 0.30
+MIN_CONF_QUEST       = 0.40
+MIN_CONF_DIALOG      = 0.42
+MIN_CONF_BUTTON      = 0.50
+MIN_CONF_ACTION      = 0.50
 
+# ── Pathfinding ───────────────────────────────────────────────────────────────
+PATHFINDING_PATTERN = r"Pathfinding|Path\s*finding|Auto.?walk"
 
-# ── Quest priority ────────────────────────────────────────────────────────────
-# Only [Main] quests are pursued.  First match wins.
+# ── Quest sidebar ─────────────────────────────────────────────────────────────
 QUEST_PRIORITY: list[tuple[str, str]] = [
     (r"\[Main\]", "Main"),
 ]
-MIN_CONF_QUEST = 0.40
 
-
-# ── Interaction button (Examine / Inspect / Talk) ────────────────────────────
+# ── Interaction buttons ───────────────────────────────────────────────────────
 INTERACTION_PATTERNS = [
     r"\bExamine\b",
     r"\bInspect\b",
     r"\bTalk\b",
+    r"\bInvestigate\b",
 ]
-# Icon button sits this many pixels ABOVE the 'Examine' text label.
-# Measured: Examine @ (713,279), yellow icon centroid @ (705,252) → 27px up.
-INTERACTION_BUTTON_OFFSET_Y = -27
-MIN_CONF_BUTTON = 0.50
+INTERACTION_BUTTON_OFFSET_Y = -27   # icon sits above the text label
 
+# ── Dialog buttons ────────────────────────────────────────────────────────────
+SKIP_PATTERN = r"\bSkip\b"
 
-# ── Smart action buttons ─────────────────────────────────────────────────────
-# Zone: cx > QUEST_PANEL_X_MAX  AND  HUD_TOP_Y_MAX < cy < GAME_WORLD_Y_MAX
+DIALOG_CHOICE_PATTERNS = [
+    r"Inquir",
+    r"\bNext\b",
+    r"Continu",
+    r"\bClose\b",
+    r"\bOk\b", r"\bOK\b",
+    r"\bYes\b",
+    r"\bAgree\b",
+    r"Got\s*it",
+    r"Understood",
+    r"I\s*see",
+    r"\bDone\b",
+    r"\bFinish\b",
+    r"\bBye\b",
+    r"\bThanks\b",
+    r"I.ll\s*do\s*it",
+    r"\bAccept\b",
+    r"\bConfirm\b",
+    r"\bStart\b",
+    r"\bReceive\b",
+    r"\bClaim\b",
+    r"\bReward\b",
+    r"Let.s\s*go",
+    r"\bReturn\b",
+]
+DIALOG_CHOICE_X_MIN = QUEST_PANEL_X_MAX
+DIALOG_ADVANCE_TAP_X = 650
+DIALOG_ADVANCE_TAP_Y = 695
+
+# ── Action buttons in game world ──────────────────────────────────────────────
 ACTION_BUTTON_PATTERNS: list[str] = [
     r"\bShow\b", r"\bPresent\b", r"\bDisplay\b",
     r"\bPhotograph\b", r"\bPhoto\b", r"\bCapture\b",
-    r"\bSnapshot\b", r"\bCamera\b", r"\bShoot\b",
+    r"\bSnapshot\b", r"\bCamera\b",
     r"\bCollect\b", r"\bGather\b", r"\bPick\s*up\b",
     r"\bLoot\b", r"\bHarvest\b",
     r"\bActivate\b", r"\bUse\b", r"\bOpen\b",
@@ -107,146 +132,139 @@ ACTION_BUTTON_PATTERNS: list[str] = [
     r"\bClaim\b", r"\bReceive\b",
     r"\bExchange\b", r"\bTrade\b", r"\bBuy\b", r"\bSell\b",
 ]
-MIN_CONF_ACTION = 0.50
+
+# ── Stall detection ───────────────────────────────────────────────────────────
+STALL_THRESHOLD = 12
+
+# ── Per-run state ─────────────────────────────────────────────────────────────
+_last_step_id: Optional[int] = None
+_stall_recovery_count: int = 0
 
 
-# ── Dialog buttons ────────────────────────────────────────────────────────────
-SKIP_PATTERN = r"\bSkip\b"
+# ── Quest sidebar parsing ─────────────────────────────────────────────────────
 
-# Advance / close buttons.  Must be below HUD and right of quest sidebar.
-DIALOG_CHOICE_PATTERNS = [
-    r"Inquir",      # 'Inquire' — completes NPC conversation
-    r"\bNext\b",
-    r"Continu",     # 'Continue'
-    r"\bClose\b",
-    r"\bOk\b", r"\bOK\b",
-    r"\bYes\b",
-    r"\bAgree\b",
-    r"Got\s*it",
-    r"Understood",
-    r"I\s*see",
-    r"\bDone\b",
-    r"\bFinish\b",
-    r"\bBye\b",
-    r"\bThanks\b",
-]
-# Choice buttons: below the HUD, right of the quest sidebar.
-DIALOG_CHOICE_X_MIN = QUEST_PANEL_X_MAX   # 260
-DIALOG_CHOICE_Y_MIN = HUD_TOP_Y_MAX       # 300 — never click Leave/Backpack
+def _parse_sidebar(regions) -> dict | None:
+    """
+    Extract quest data from the sidebar OCR regions.
 
-MIN_CONF_DIALOG = 0.50
+    Returns a dict with keys:
+      title, quest_type, step_text, distance, target, title_region
+    """
+    for pattern, qtype in QUEST_PRIORITY:
+        title_r = find_text(regions, pattern, min_conf=MIN_CONF_QUEST)
+        if title_r is None:
+            continue
+
+        sidebar_below = sorted(
+            [
+                r for r in regions
+                if r.cx < QUEST_PANEL_X_MAX + 50
+                and r.cy > title_r.cy
+                and r.conf >= 0.35
+            ],
+            key=lambda r: r.cy,
+        )
+
+        step_lines: list[str] = []
+        distance: Optional[int] = None
+        target: Optional[str] = None
+
+        for r in sidebar_below:
+            t = r.text.strip()
+            if not t:
+                continue
+            dm = re.search(r'[Dd]istance\s+to\s+target\s*:?\s*(\d+)\s*m', t)
+            if dm:
+                distance = int(dm.group(1))
+                continue
+            tm = re.search(r'[Tt]arget\s+location\s*:?\s*(.+)', t)
+            if tm:
+                target = tm.group(1).strip()
+                continue
+            if re.search(r'\[Main\]|\[Tutorial\]|\[Side\]|\[Daily\]', t):
+                break
+            step_lines.append(t)
+
+        step_text = " ".join(step_lines).strip()
+
+        # Build full title (may wrap onto next line)
+        title_parts = [title_r.text]
+        for r in sidebar_below[:2]:
+            if (
+                r.cy <= title_r.cy + 20
+                and not re.search(r'\[Main\]|\[Tutorial\]|Distance|Target', r.text)
+            ):
+                title_parts.append(r.text)
+        title = " ".join(title_parts).strip()
+
+        return {
+            "title": title,
+            "quest_type": qtype,
+            "step_text": step_text,
+            "distance": distance,
+            "target": target,
+            "title_region": title_r,
+        }
+
+    return None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _extract_distance(regions) -> str | None:
-    """Return e.g. '31 m' from 'Distance to target: 31 m', or None."""
-    r = find_text(regions, r"Distance to target", min_conf=0.40)
-    if r:
-        m = re.search(r"Distance to target\s*:?\s*(.+)", r.text, re.IGNORECASE)
-        if m:
-            return m.group(1).strip()
-    return None
-
-
-def _extract_target(regions) -> str | None:
-    """Return e.g. 'Prontera South Gate' from 'Target location: …', or None."""
-    r = find_text(regions, r"Target location", min_conf=0.40)
-    if r:
-        m = re.search(r"Target location\s*:?\s*(.+)", r.text, re.IGNORECASE)
-        if m:
-            return m.group(1).strip()
-    return None
-
-
-def _build_quest_title(regions) -> tuple[str, str, object] | None:
-    """
-    Find the [Main] quest row and reconstruct the full title.
-
-    Vision sometimes splits '[Main] Bernard's' and 'Recollection' into two
-    separate regions because of line wrapping.  We merge consecutive
-    quest-panel regions that are vertically adjacent (<= 30px apart).
-
-    Returns (quest_type, full_title_text, region) or None.
-    """
-    for pattern, qtype in QUEST_PRIORITY:
-        r = find_text(regions, pattern, min_conf=MIN_CONF_QUEST)
-        if r is None:
-            continue
-        # Gather adjacent regions in the quest panel that are below the
-        # matched row within 30px (continuation of the same wrapped title).
-        parts = [r.text]
-        for other in sorted(regions, key=lambda o: o.cy):
-            if other is r:
-                continue
-            if (
-                other.cx < QUEST_PANEL_X_MAX + 50
-                and r.cy < other.cy <= r.cy + 30
-                and other.conf >= MIN_CONF_QUEST
-                and not re.search(r"\[Main\]|\[Tutorial\]|Distance|Target", other.text)
-            ):
-                parts.append(other.text)
-        return qtype, " ".join(parts), r
-    return None
-
 
 def _is_pathfinding(regions) -> bool:
     return find_text(regions, PATHFINDING_PATTERN, min_conf=MIN_CONF_PATHFINDING) is not None
 
 
 def _find_dialog_button(regions):
-    """
-    Returns (cx, cy, label, action) if a dialog interaction is needed, else None.
-
-    Only fires when an explicit button is present — Skip takes priority,
-    then any choice/advance button.  The chat/dialog zone (y > 620) is
-    NEVER clicked directly; NPC dialogs always surface a button.
-    """
-    # 1. Skip
+    """Returns (cx, cy, label, action) or None."""
     skip = find_text(regions, SKIP_PATTERN, min_conf=MIN_CONF_DIALOG)
-    if skip and skip.cx > QUEST_PANEL_X_MAX and skip.cy > HUD_TOP_Y_MAX:
+    if skip and skip.cx > QUEST_PANEL_X_MAX:
         return skip.cx, skip.cy, skip.text, "skip"
 
-    # 2. Choice / advance buttons
-    for pattern in DIALOG_CHOICE_PATTERNS:
-        r = find_text(regions, pattern, min_conf=MIN_CONF_DIALOG)
-        if r and r.cx > DIALOG_CHOICE_X_MIN and r.cy > DIALOG_CHOICE_Y_MIN:
+    for patt in DIALOG_CHOICE_PATTERNS:
+        r = find_text(regions, patt, min_conf=MIN_CONF_DIALOG)
+        if r and r.cx > DIALOG_CHOICE_X_MIN:
+            if patt == r"\bLeave\b" and r.cy < HUD_TOP_Y_MAX:
+                continue
             return r.cx, r.cy, r.text, "choice"
+
+    dialog_text = [
+        reg for reg in regions
+        if DIALOG_TEXT_Y_MIN <= reg.cy <= DIALOG_TEXT_Y_MAX
+        and reg.cx > QUEST_PANEL_X_MAX
+        and len(reg.text.strip()) > 8
+    ]
+    if dialog_text:
+        return DIALOG_ADVANCE_TAP_X, DIALOG_ADVANCE_TAP_Y, "[tap]", "tap"
 
     return None
 
 
 def _find_interaction_button(regions, screenshot=None):
-    """
-    Return (cx, cy, label) for Examine/Inspect/Talk, or None.
-
-    The label can appear anywhere in the game world (including y < HUD_TOP_Y_MAX
-    when the NPC is near the top of the screen), so we only gate on:
-      - cx > QUEST_PANEL_X_MAX  (not in the sidebar)
-      - cy < GAME_WORLD_Y_MAX   (not in the chat/dialog zone)
-    """
-    for pattern in INTERACTION_PATTERNS:
-        r = find_text(regions, pattern, min_conf=MIN_CONF_BUTTON)
+    """Return (cx, cy, label) for Examine/Talk/Inspect, or None."""
+    for patt in INTERACTION_PATTERNS:
+        r = find_text(regions, patt, min_conf=MIN_CONF_BUTTON)
         if r and r.cx > QUEST_PANEL_X_MAX and r.cy < GAME_WORLD_Y_MAX:
             return r.cx, r.cy + INTERACTION_BUTTON_OFFSET_Y, r.text
 
-    # Template-matching fallback: catches the icon when OCR misses the label.
-    # Add templates/examine_icon.png (crop the yellow magnifying-glass) to enable.
     if screenshot is not None:
-        from recognizer import find_template
-        match = find_template(screenshot, "examine_icon.png", threshold=0.75)
-        if match:
-            ix, iy, _ = match
-            if ix > QUEST_PANEL_X_MAX and iy < GAME_WORLD_Y_MAX:
-                return ix, iy, "Examine"
+        try:
+            from recognizer import find_template
+            match = find_template(screenshot, "examine_icon.png", threshold=0.75)
+            if match:
+                ix, iy, _ = match
+                if ix > QUEST_PANEL_X_MAX and iy < GAME_WORLD_Y_MAX:
+                    return ix, iy, "Examine"
+        except Exception:
+            pass
 
     return None
 
 
 def _find_action_button(regions):
     """Return (cx, cy, label) for any game-world action button, or None."""
-    for pattern in ACTION_BUTTON_PATTERNS:
-        r = find_text(regions, pattern, min_conf=MIN_CONF_ACTION)
+    for patt in ACTION_BUTTON_PATTERNS:
+        r = find_text(regions, patt, min_conf=MIN_CONF_ACTION)
         if (
             r
             and r.cx > QUEST_PANEL_X_MAX
@@ -256,21 +274,61 @@ def _find_action_button(regions):
     return None
 
 
+def _stall_recovery(sidebar, step_id, step_type, regions, screenshot, bounds, status_cb):
+    """Try to break out of a stall. Returns True if a recovery click was sent."""
+    global _stall_recovery_count
+    _stall_recovery_count += 1
+    attempt = _stall_recovery_count
+
+    status_cb(f"⚠️  Stall #{attempt} on [{step_type}] — trying recovery")
+
+    # Re-click the quest row to refresh navigation target
+    if step_type in ("NAVIGATE", "TALK", "EXAMINE", "DELIVER",
+                     "COLLECT", "COMBAT", "ENTER"):
+        region = sidebar.get("title_region") if sidebar else None
+        if region:
+            status_cb("  ↩  Re-clicking quest row")
+            click(region.cx, region.cy, bounds)
+            _db.record_click(step_id, "navigate", "[stall-refresh]",
+                             region.cx, region.cy, state_changed=False)
+            time.sleep(0.5)
+            return True
+
+    # Low-conf scan for action buttons
+    if step_type in ("USE", "PHOTO", "UNKNOWN"):
+        for patt in ACTION_BUTTON_PATTERNS:
+            r = find_text(regions, patt, min_conf=0.35)
+            if r and r.cx > QUEST_PANEL_X_MAX and HUD_TOP_Y_MAX < r.cy < GAME_WORLD_Y_MAX:
+                status_cb(f"  ↩  Low-conf button: \"{r.text}\"")
+                click(r.cx, r.cy, bounds)
+                _db.record_click(step_id, "action", r.text,
+                                 r.cx, r.cy, state_changed=False)
+                time.sleep(0.4)
+                return True
+
+    # Every 3rd stall attempt: tap game world centre
+    if attempt % 3 == 0:
+        tx, ty = 600, 450
+        status_cb(f"  ↩  Tapping game world ({tx},{ty})")
+        click(tx, ty, bounds)
+        time.sleep(0.5)
+        return True
+
+    return False
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def do_quest_scan(
     status_cb: Callable[[str], None] = print,
 ) -> tuple[dict | None, bool]:
     """
-    Single Vision pass: capture → read text → act.
+    Single OCR pass: capture → read → classify → act → persist.
 
-    Returns
-    -------
-    quest_info : dict | None
-        Keys: type, title, distance, target  (for the dashboard)
-    clicked : bool
-        True if any click was sent this cycle.
+    Returns (quest_info_dict | None, clicked: bool).
     """
+    global _last_step_id, _stall_recovery_count
+
     screenshot, bounds = capture_window()
     if screenshot is None or bounds is None:
         status_cb("⚠  Cannot capture RöX window")
@@ -281,80 +339,116 @@ def do_quest_scan(
         status_cb("No text detected in window")
         return None, False
 
-    # Update game state tracker with fresh OCR results (thread-safe)
     _state_tracker.update(regions)
 
-    # ── Step 0: Pathfinding idle ──────────────────────────────────────────
+    # ── Step 0: Pathfinding active ────────────────────────────────────────
     if _is_pathfinding(regions):
-        status_cb("🚶 Pathfinding active — waiting for arrival…")
-        return _make_quest_info(regions), False
+        sidebar = _parse_sidebar(regions)
+        dist = sidebar["distance"] if sidebar else None
+        status_cb(f"🚶 Pathfinding{(' — ' + str(dist) + ' m') if dist else ''}")
+        return _build_quest_info(sidebar), False
 
-    # ── Step 1: Dialog advancement ────────────────────────────────────────
+    # ── Parse sidebar & persist observation ──────────────────────────────
+    sidebar = _parse_sidebar(regions)
+    step_id: Optional[int] = None
+    step_type: str = "UNKNOWN"
+
+    if sidebar and sidebar["step_text"]:
+        step_type = classify_step(sidebar["step_text"])
+        step_id = _db.observe_step(
+            quest_title=sidebar["title"],
+            step_text=sidebar["step_text"],
+            step_type=step_type,
+            distance=sidebar["distance"],
+            target=sidebar["target"],
+        )
+
+    # Detect step change → mark old step done, reset stall counter
+    if step_id != _last_step_id:
+        if _last_step_id is not None:
+            _db.mark_step_done(_last_step_id)
+            status_cb(f"✅ Previous step done — now [{step_type}]")
+        _last_step_id = step_id
+        _stall_recovery_count = 0
+
+    # ── Step 1: Dialog / Skip ─────────────────────────────────────────────
     dlg = _find_dialog_button(regions)
     if dlg:
         dx, dy, dlabel, action = dlg
         if action == "skip":
-            status_cb(f"💬 Skipping cutscene at ({dx}, {dy})")
-        elif action == "choice":
-            status_cb(f"💬 Dialog — clicking \"{dlabel}\" at ({dx}, {dy})")
+            status_cb(f"⏭  Skip at ({dx},{dy})")
+        elif action == "tap":
+            status_cb("💬 NPC dialog — tapping to advance")
         else:
-            status_cb(f"💬 NPC speech — advancing dialog at ({dx}, {dy})")
+            status_cb(f"💬 '{dlabel}' at ({dx},{dy})")
         click(dx, dy, bounds)
-        time.sleep(0.8)
-        # Fall through to Step 4 so the quest row is re-clicked once the
-        # dialog clears.
+        if step_id:
+            _db.record_click(step_id, action, dlabel, dx, dy, state_changed=True)
+        time.sleep(0.5 if action in ("skip", "tap") else 1.0)
+        # Fall through to Step 4 to re-click quest row after dialog clears
 
     if not dlg:
         # ── Step 2: Interaction button ────────────────────────────────────
         btn = _find_interaction_button(regions, screenshot)
         if btn:
             bx, by, blabel = btn
-            status_cb(f"🖱  Interact \"{blabel}\" at ({bx}, {by})")
+            status_cb(f"🖱  {blabel} at ({bx},{by})")
             click(bx, by, bounds)
+            if step_id:
+                _db.record_click(step_id, "interact", blabel,
+                                 bx, by, state_changed=True)
             time.sleep(0.4)
-            return _make_quest_info(regions), True
+            return _build_quest_info(sidebar), True
 
         # ── Step 3: Action button ─────────────────────────────────────────
-        action_btn = _find_action_button(regions)
-        if action_btn:
-            ax, ay, alabel = action_btn
-            status_cb(f"🎯 Action \"{alabel}\" at ({ax}, {ay})")
+        act_btn = _find_action_button(regions)
+        if act_btn:
+            ax, ay, alabel = act_btn
+            status_cb(f"🎯 '{alabel}' [{step_type}] at ({ax},{ay})")
             click(ax, ay, bounds)
+            if step_id:
+                _db.record_click(step_id, "action", alabel,
+                                 ax, ay, state_changed=True)
             time.sleep(0.4)
-            return _make_quest_info(regions), True
+            return _build_quest_info(sidebar), True
+
+        # ── Stall check before Step 4 ─────────────────────────────────────
+        if step_id and _db.is_stalled(step_id, STALL_THRESHOLD):
+            recovered = _stall_recovery(
+                sidebar, step_id, step_type,
+                regions, screenshot, bounds, status_cb,
+            )
+            if recovered:
+                return _build_quest_info(sidebar), True
 
     # ── Step 4: Quest row navigation ──────────────────────────────────────
-    quest = _build_quest_title(regions)
-    info  = _make_quest_info(regions, quest)
-
-    if quest:
-        qtype, title, region = quest
-        status_cb(f"👆 [{qtype}] {title!r} — clicking to navigate")
-        click(region.cx, region.cy, bounds)
+    if sidebar:
+        r = sidebar["title_region"]
+        dist_str = f" ({sidebar['distance']} m)" if sidebar["distance"] else ""
+        status_cb(f"👆 [{step_type}]{dist_str} {sidebar['step_text'][:50]!r}")
+        click(r.cx, r.cy, bounds)
+        if step_id:
+            _db.record_click(step_id, "navigate", "[Main]",
+                             r.cx, r.cy, state_changed=False)
         time.sleep(0.3)
-        return info, True
+        return _build_quest_info(sidebar), True
 
     visible = [r.text for r in regions[:6]]
     status_cb(f"No quest or action found. Visible: {visible}")
-    return info, False
+    return None, False
 
 
-# ── Internal ──────────────────────────────────────────────────────────────────
+# ── Info dict for dashboard ───────────────────────────────────────────────────
 
-def _make_quest_info(regions, quest_tuple=None) -> dict | None:
-    """Build the quest-info dict shown in the dashboard."""
-    distance = _extract_distance(regions)
-    target   = _extract_target(regions)
-
-    if quest_tuple is None:
-        quest_tuple = _build_quest_title(regions)
-    if quest_tuple is None:
+def _build_quest_info(sidebar: dict | None) -> dict | None:
+    if sidebar is None:
         return None
-
-    qtype, title, _ = quest_tuple
+    step_type = classify_step(sidebar.get("step_text", ""))
     return {
-        "type":     qtype,
-        "title":    title,
-        "distance": distance,
-        "target":   target,
+        "type":      sidebar.get("quest_type", "?"),
+        "title":     sidebar.get("title", ""),
+        "step":      sidebar.get("step_text", ""),
+        "step_type": step_type,
+        "distance":  sidebar.get("distance"),
+        "target":    sidebar.get("target"),
     }
