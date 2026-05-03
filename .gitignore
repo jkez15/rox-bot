@@ -26,7 +26,7 @@
 .vscode/
 __pycache__/
 debug_shots/
-decompiled/
+# decompiled/ — tracked in git for reference
 env/
 learned_buttons.json
 rox_traffic/
