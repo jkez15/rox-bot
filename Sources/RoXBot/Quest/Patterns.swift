@@ -15,6 +15,9 @@ enum Patterns {
     static let distance    = #"(\d+)\s*m\b"#
 
     // MARK: - Interaction buttons (NPC / object — game world only)
+    // Only include words that are exclusively used as NPC/object interaction button labels.
+    // Generic English words (Open, Read, Look, Search, Press, Pull, Push) are removed
+    // because they appear in item tooltips, map labels, and chat — causing false clicks.
     static let interaction: [String] = [
         #"[Ee]xamin"#,
         #"[Ii1]nspect"#,
@@ -25,42 +28,30 @@ enum Patterns {
         #"\bInteract\b"#,
         #"\bApproach\b"#,
         #"\bGreet\b"#,
-        #"\bActivat"#,
         #"\bOperat"#,
         #"\bProbe\b"#,
-        #"\bSearch\b"#,
         #"\bTouch\b"#,
-        #"\bPress\b"#,
-        #"\bPull\b"#,
-        #"\bPush\b"#,
-        #"\bOpen\b"#,
-        #"\bRead\b"#,
-        #"\bLook\b"#,
     ]
 
     // MARK: - Dialog control buttons
     static let skip = #"\bSkip\b"#
 
+    // Dialog choice buttons — words that appear ONLY as NPC dialog response buttons.
+    // Generic words (Close, Done, Start, Return, Accept, Receive, Claim) removed from here
+    // because they appear in HUD menus, inventory, and quest panels causing false clicks.
+    // Those are allowed only as action buttons (step 3) where zone checks are stricter.
     static let dialogChoice: [String] = [
         #"Inquir"#,
         #"\bNext\b"#,
         #"Continu"#,
-        #"\bClose\b"#,
         #"\bOk\b"#, #"\bOK\b"#,
         #"\bYes\b"#,
         #"\bAgree\b"#,
         #"Got\s*it"#,
         #"Understood"#,
-        #"\bDone\b"#,
-        #"\bFinish\b"#,
         #"\bBye\b"#,
-        #"\bAccept\b"#,
         #"\bConfirm\b"#,
-        #"\bStart\b"#,
-        #"\bReceive\b"#,
-        #"\bClaim\b"#,
         #"Let.s\s*go"#,
-        #"\bReturn\b"#,
     ]
 
     // MARK: - Action buttons (game world)

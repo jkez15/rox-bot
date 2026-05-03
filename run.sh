@@ -16,7 +16,13 @@ cp .build/debug/RoXBot RoXBot.app/Contents/MacOS/RoXBot
 
 echo "🔏 Signing…"
 xattr -cr RoXBot.app
-codesign --force --deep --sign - RoXBot.app
+CERT_NAME="RoXBotSign"
+if security find-certificate -c "$CERT_NAME" ~/Library/Keychains/login.keychain-db &>/dev/null; then
+    codesign --force --deep --sign "$CERT_NAME" RoXBot.app
+else
+    codesign --force --deep --sign - RoXBot.app
+    echo "⚠️  Ad-hoc sign used — run 'bash setup_signing.sh' once to fix TCC resets."
+fi
 
 echo "🚀 Launching RoXBot…"
 open RoXBot.app

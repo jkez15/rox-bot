@@ -63,23 +63,38 @@ final class LogMonitor {
     }
 
     private func processLine(_ line: String) {
-        // Scene change
-        if line.contains("LoadScene") || line.contains("EnterScene") {
-            // Extract a 4-digit scene ID (e.g. 1010, 1110 …)
+        // ── Scene change ─────────────────────────────────────────────────
+        // Real log: "C# Enter Scene: <hostName>  <sceneId>"
+        // e.g.    : "C# Enter Scene: Prontera  1010"
+        if line.contains("C# Enter Scene:") {
             let tokens = line.components(separatedBy: CharacterSet.decimalDigits.inverted)
-            if let idStr = tokens.first(where: { $0.count == 4 }), let id = Int(idStr) {
+            // Pick the last 4-digit number — that's the sceneId
+            if let idStr = tokens.last(where: { $0.count == 4 }), let id = Int(idStr) {
                 currentSceneId = id
-                print("[LogMonitor] Scene → \(id)")
+                print("[LogMonitor] Scene → \(id) (\(SceneID.name[id] ?? "unknown"))")
             }
         }
+        if line.contains("C# Leave Scene") {
+            // Don't clear sceneId — we want to remember where we were
+            print("[LogMonitor] Leaving scene")
+        }
 
-        // Pathfinding
-        if line.contains("AutoPath") || line.lowercased().contains("pathfind") {
-            if line.contains("Start") || line.contains("Begin") || line.contains("Active") {
-                isPathfinding = true
-            } else if line.contains("End") || line.contains("Stop") || line.contains("Arriv") {
-                isPathfinding = false
-            }
+        // ── Autopathfinding ──────────────────────────────────────────────
+        // Real log start: "AutoPath:<toSceneId>,<startPos>,<target>"
+        // Real log end:   "AutoPathing Completed"
+        // Also: XLogger.Log("AutoPath:") at line 314821
+        if line.hasPrefix("AutoPath:") || line.contains("AutoPath:") {
+            isPathfinding = true
+            print("[LogMonitor] Pathfinding started")
+        }
+        if line.contains("AutoPathing Completed") {
+            isPathfinding = false
+            print("[LogMonitor] Pathfinding completed")
+        }
+        // AutoPath stopped by user or error
+        if line.contains("StopAutoPath") || line.contains("AutoPath Error") || line.contains("AutoPathError") {
+            isPathfinding = false
+            print("[LogMonitor] Pathfinding stopped")
         }
     }
 }

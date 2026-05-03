@@ -25,6 +25,8 @@ final class AutomationEngine {
     // MARK: - Lifecycle
 
     func start() async {
+        // Load offline game data (NPC positions, scene IDs from bundle_dumps)
+        GameKnowledge.shared.load()
         LogMonitor.shared.startMonitoring()
 
         // Check Accessibility permission — required for CGEventPostToPid to work
@@ -112,24 +114,33 @@ final class AutomationEngine {
         let regions = await OCREngine.recognize(image, minConfidence: 0.30)
         print("[Engine] OCR found \(regions.count) regions: \(regions.prefix(5).map(\.text))")
 
-        // 2. Analyse
-        let (info, action) = QuestScanner.scan(regions: regions)
+        // 2. Build context from OCR + live game state
+        let context = ScreenContext(
+            regions:       regions,
+            questState:    QuestScanner.parseSidebar(regions),
+            isPathfinding: LogMonitor.shared.isPathfinding,
+            currentScene:  LogMonitor.shared.currentSceneId
+        )
 
-        // 3. Update dashboard
-        if let info {
-            dashboard.setQuest(title: info.title, step: info.stepText, distance: info.distance)
-            let dist = info.distance.map { "  |  \($0) m" } ?? ""
-            dashboard.setStatus("\(info.title)\(dist)")
+        // 3. Analyse
+        let (quest, action) = QuestScanner.scan(context: context)
+
+        // 4. Update dashboard
+        if quest.hasActiveQuest {
+            dashboard.setQuest(title: quest.title, step: quest.stepText, distance: quest.distance)
+            let dist = quest.distance.map { "  |  \($0) m" } ?? ""
+            let scene = context.currentScene.flatMap { SceneID.name[$0] }.map { " [\($0)]" } ?? ""
+            dashboard.setStatus("\(quest.title)\(dist)\(scene)")
         } else {
             dashboard.setStatus("Running — monitoring…")
         }
 
-        // 4. Deduplicate + rate limit
+        // 5. Deduplicate + rate limit
         let shouldAct = await queue.shouldExecute(action)
         guard shouldAct else { return }
         await queue.record(action)
 
-        // 5. Execute
+        // 6. Execute
         print("[Engine] Action: \(action)")
         await execute(action, bounds: bounds)
     }

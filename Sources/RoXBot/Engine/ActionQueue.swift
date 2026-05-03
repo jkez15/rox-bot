@@ -85,13 +85,6 @@ private enum ActionKind: Equatable {
 
 private extension ScanAction {
     var coords: (Int, Int) {
-        switch self {
-        case .none, .pathfinding:                return (0, 0)
-        case .titleScreen(let cx, let cy):       return (cx, cy)
-        case .dialog(let cx, let cy, _):         return (cx, cy)
-        case .interact(let cx, let cy, _):       return (cx, cy)
-        case .action(let cx, let cy, _):         return (cx, cy)
-        case .navigate(let cx, let cy, _):       return (cx, cy)
-        }
+        return coord ?? (0, 0)
     }
 }
