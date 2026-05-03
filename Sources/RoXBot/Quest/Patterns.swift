@@ -12,7 +12,21 @@ enum Patterns {
     // MARK: - Quest sidebar
     static let questRow    = #"\[Main\]|\[Sub\]|\[Daily\]|\[Guild\]"#
     static let mainQuest   = #"\[Main\]"#
+    static let dailyQuest  = #"\[Daily\]"#
+    static let guildQuest  = #"\[Guild\]"#
+    static let subQuest    = #"\[Sub\]"#
     static let distance    = #"(\d+)\s*m\b"#
+
+    /// Returns the sidebar quest pattern for a specific mode.
+    static func questRowForMode(_ mode: AutomationMode) -> String {
+        switch mode {
+        case .mainQuest:       return mainQuest
+        case .dailyQuests:     return dailyQuest
+        case .guildQuests:     return guildQuest
+        case .commissionBoard: return questRow   // any quest type while doing commissions
+        case .autoPotion:      return questRow   // monitor all
+        }
+    }
 
     // MARK: - Interaction buttons (NPC / object — game world only)
     // Only include words that are exclusively used as NPC/object interaction button labels.
@@ -86,6 +100,19 @@ enum Patterns {
         #"\bPlay\b"#, #"\bFight\b"#,
         #"\bRepair\b"#, #"\bCraft\b"#,
         #"\bSummon\b"#,
+    ]
+
+    // MARK: - Commission board buttons
+    // These appear inside the commission board popup window (not game world).
+    // Used only when AutomationMode == .commissionBoard.
+    static let commissionBoard: [String] = [
+        #"Commission"#,
+        #"Quest\s*Board"#,
+        #"Accept\s*Quest"#,
+        #"Claim\s*Reward"#,
+        #"\bSubmit\b"#,
+        #"\bDecline\b"#,
+        #"Refresh"#,
     ]
 
     // MARK: - Helpers

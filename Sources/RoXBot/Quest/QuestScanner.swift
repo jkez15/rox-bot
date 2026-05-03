@@ -22,13 +22,14 @@ struct QuestScanner {
     /// Returns (parsed sidebar state, action to execute this cycle).
     static func scan(context: ScreenContext) -> (quest: QuestState, action: ScanAction) {
         let regions = context.regions
+        let mode = context.mode
 
         // ── Pre-check: login / title screen ───────────────────────────────
         if let r = OCREngine.find(regions, pattern: Patterns.tapToEnter, minConfidence: 0.5) {
             return (QuestState(), .titleScreen(cx: r.cx, cy: r.cy))
         }
 
-        let quest = parseSidebar(regions)
+        let quest = parseSidebar(regions, mode: mode)
 
         // ── Step 0: Pathfinding active — never interrupt movement ──────────
         // Trust BOTH LogMonitor (reliable) and OCR "Pathfinding" text (visible HUD)
@@ -59,9 +60,16 @@ struct QuestScanner {
             return (quest, action)
         }
 
+        // ── Step 3.5: Commission board buttons (only in commission mode) ───
+        if mode == .commissionBoard {
+            if let action = commissionBoardButton(regions) {
+                return (quest, action)
+            }
+        }
+
         // ── Step 4: Quest row tap — only when NOT already at target ────────
         // If distance == 0 we're already there; tapping the row would just stall.
-        if let action = questRow(regions, quest: quest) {
+        if let action = questRow(regions, quest: quest, mode: mode) {
             return (quest, action)
         }
 
@@ -70,9 +78,10 @@ struct QuestScanner {
 
     // MARK: - Sidebar parser
 
-    static func parseSidebar(_ regions: [TextRegion]) -> QuestState {
+    static func parseSidebar(_ regions: [TextRegion], mode: AutomationMode = .mainQuest) -> QuestState {
+        let pattern = Patterns.questRowForMode(mode)
         guard
-            let titleRegion = OCREngine.find(regions, pattern: Patterns.questRow,
+            let titleRegion = OCREngine.find(regions, pattern: pattern,
                                              minConfidence: confSidebar),
             titleRegion.cx < Zones.questPanelXMax
         else { return QuestState() }
@@ -177,14 +186,28 @@ struct QuestScanner {
         return nil
     }
 
+    // MARK: - Step 3.5 – commission board buttons
+
+    private static func commissionBoardButton(_ regions: [TextRegion]) -> ScanAction? {
+        for pattern in Patterns.commissionBoard {
+            guard
+                let r = OCREngine.find(regions, pattern: pattern, minConfidence: confAction),
+                r.cx > Zones.questPanelXMax
+            else { continue }
+            return .action(cx: r.cx, cy: r.cy, label: r.text)
+        }
+        return nil
+    }
+
     // MARK: - Step 4 – quest row navigation
 
-    private static func questRow(_ regions: [TextRegion], quest: QuestState) -> ScanAction? {
+    private static func questRow(_ regions: [TextRegion], quest: QuestState, mode: AutomationMode) -> ScanAction? {
         // Already at target → don't re-tap, an interaction button should appear
         if quest.isAtTarget { return nil }
 
+        let pattern = Patterns.questRowForMode(mode)
         guard
-            let r = OCREngine.find(regions, pattern: Patterns.questRow,
+            let r = OCREngine.find(regions, pattern: pattern,
                                    minConfidence: confSidebar),
             r.cx < Zones.questPanelXMax
         else { return nil }

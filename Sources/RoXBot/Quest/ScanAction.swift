@@ -1,5 +1,39 @@
 import Foundation
 
+// MARK: - Automation mode — selectable from the dashboard
+
+enum AutomationMode: String, CaseIterable, CustomStringConvertible {
+    case mainQuest       = "Main Quest"
+    case commissionBoard = "Commission Board"
+    case dailyQuests     = "Daily Quests"
+    case guildQuests     = "Guild Quests"
+    case autoPotion      = "Auto-Potion"
+
+    var description: String { rawValue }
+
+    /// The sidebar quest prefix this mode targets (nil = all / N/A).
+    var questPrefix: String? {
+        switch self {
+        case .mainQuest:       return "[Main]"
+        case .dailyQuests:     return "[Daily]"
+        case .guildQuests:     return "[Guild]"
+        case .commissionBoard: return nil
+        case .autoPotion:      return nil
+        }
+    }
+
+    /// Short icon for dashboard labels.
+    var icon: String {
+        switch self {
+        case .mainQuest:       return "📜"
+        case .commissionBoard: return "📋"
+        case .dailyQuests:     return "📅"
+        case .guildQuests:     return "⚔️"
+        case .autoPotion:      return "🧪"
+        }
+    }
+}
+
 // MARK: - Quest state parsed from OCR sidebar each frame
 
 struct QuestState {
@@ -20,6 +54,7 @@ struct ScreenContext {
     let questState:   QuestState
     let isPathfinding: Bool      // from LogMonitor
     let currentScene:  Int?      // from LogMonitor
+    let mode:          AutomationMode
 }
 
 // MARK: - Rich action type

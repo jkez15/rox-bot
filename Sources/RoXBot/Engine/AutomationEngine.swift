@@ -27,6 +27,7 @@ final class AutomationEngine {
     func start() async {
         // Load offline game data (NPC positions, scene IDs from bundle_dumps)
         GameKnowledge.shared.load()
+        CommissionData.shared.load()
         LogMonitor.shared.startMonitoring()
 
         // Check Accessibility permission — required for CGEventPostToPid to work
@@ -115,11 +116,13 @@ final class AutomationEngine {
         print("[Engine] OCR found \(regions.count) regions: \(regions.prefix(5).map(\.text))")
 
         // 2. Build context from OCR + live game state
+        let mode = dashboard.selectedMode
         let context = ScreenContext(
             regions:       regions,
-            questState:    QuestScanner.parseSidebar(regions),
+            questState:    QuestScanner.parseSidebar(regions, mode: mode),
             isPathfinding: LogMonitor.shared.isPathfinding,
-            currentScene:  LogMonitor.shared.currentSceneId
+            currentScene:  LogMonitor.shared.currentSceneId,
+            mode:          mode
         )
 
         // 3. Analyse

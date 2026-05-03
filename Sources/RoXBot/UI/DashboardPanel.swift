@@ -8,12 +8,16 @@ final class DashboardPanel: NSObject {
     // ── State ─────────────────────────────────────────────────────────────
     private(set) var stopRequested = false
     private(set) var paused        = false
+    private(set) var selectedMode: AutomationMode = .mainQuest
 
     private var started               = false
     private var startContinuation: CheckedContinuation<Void, Never>?
 
     private var cycleCount  = 0
     private var actionCount = 0
+
+    // Callback — engine subscribes to mode changes
+    var onModeChanged: ((AutomationMode) -> Void)?
 
     // ── UI ────────────────────────────────────────────────────────────────
     private var panel:        NSPanel!
@@ -24,6 +28,7 @@ final class DashboardPanel: NSObject {
     private var startBtn:     NSButton!
     private var pauseBtn:     NSButton!
     private var logTextView:  NSTextView!
+    private var modeButtons:  [AutomationMode: NSButton] = [:]
 
     // MARK: - Lifecycle
 
@@ -105,7 +110,27 @@ final class DashboardPanel: NSObject {
         setStatus("Stopping…")
     }
 
+    @objc private func modePressed(_ sender: NSButton) {
+        guard let mode = AutomationMode.allCases.first(where: { $0.rawValue == sender.identifier?.rawValue }) else { return }
+        selectedMode = mode
+        updateModeHighlights()
+        onModeChanged?(mode)
+        log("\(mode.icon) Mode → \(mode.rawValue)")
+    }
+
     // MARK: - Private helpers
+
+    private func updateModeHighlights() {
+        for (mode, btn) in modeButtons {
+            if mode == selectedMode {
+                btn.bezelColor = NSColor.systemBlue
+                btn.contentTintColor = .white
+            } else {
+                btn.bezelColor = nil
+                btn.contentTintColor = .secondaryLabelColor
+            }
+        }
+    }
 
     private func refreshCycleLabel() {
         cycleLabel?.stringValue = "Cycles: \(cycleCount)   Actions: \(actionCount)"
@@ -121,7 +146,7 @@ final class DashboardPanel: NSObject {
 
     private func buildWindow() {
         panel = NSPanel(
-            contentRect: NSRect(x: 20, y: 200, width: 320, height: 520),
+            contentRect: NSRect(x: 20, y: 200, width: 380, height: 620),
             styleMask:   [.titled, .closable, .utilityWindow,
                           .nonactivatingPanel, .hudWindow],
             backing:     .buffered,
@@ -138,8 +163,8 @@ final class DashboardPanel: NSObject {
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment   = .leading
-        stack.spacing     = 8
-        stack.edgeInsets  = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        stack.spacing     = 6
+        stack.edgeInsets  = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
         stack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -149,11 +174,11 @@ final class DashboardPanel: NSObject {
             stack.bottomAnchor   .constraint(equalTo: root.bottomAnchor),
         ])
 
-        // Status
+        // ── Section: Status ──────────────────────────────────────────────
         statusLabel = makeLabel("Idle — press ▶ Start", size: 11, bold: true)
         stack.addArrangedSubview(statusLabel)
 
-        // Quest info
+        // ── Section: Quest info ──────────────────────────────────────────
         questLabel = makeLabel("No quest detected", size: 10)
         questLabel.maximumNumberOfLines = 3
         stack.addArrangedSubview(questLabel)
@@ -167,11 +192,50 @@ final class DashboardPanel: NSObject {
         cycleLabel = makeLabel("Cycles: 0   Actions: 0", size: 9)
         stack.addArrangedSubview(cycleLabel)
 
-        // Separator
-        let sep = NSBox(); sep.boxType = .separator
-        stack.addArrangedSubview(sep)
+        // ── Separator ────────────────────────────────────────────────────
+        stack.addArrangedSubview(makeSeparator())
 
-        // Button row
+        // ── Section: Mode Selector ───────────────────────────────────────
+        let modeHeader = makeLabel("AUTOMATION MODE", size: 9, bold: true)
+        modeHeader.textColor = .tertiaryLabelColor
+        stack.addArrangedSubview(modeHeader)
+
+        // Row 1: Main Quest, Commission Board
+        let modeRow1 = NSStackView()
+        modeRow1.orientation = .horizontal
+        modeRow1.spacing     = 6
+        modeRow1.distribution = .fillEqually
+        modeRow1.translatesAutoresizingMaskIntoConstraints = false
+
+        let mainQuestBtn       = makeModeButton(.mainQuest)
+        let commissionBoardBtn = makeModeButton(.commissionBoard)
+        modeRow1.addArrangedSubview(mainQuestBtn)
+        modeRow1.addArrangedSubview(commissionBoardBtn)
+        stack.addArrangedSubview(modeRow1)
+        modeRow1.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
+
+        // Row 2: Daily Quests, Guild Quests, Auto-Potion
+        let modeRow2 = NSStackView()
+        modeRow2.orientation = .horizontal
+        modeRow2.spacing     = 6
+        modeRow2.distribution = .fillEqually
+        modeRow2.translatesAutoresizingMaskIntoConstraints = false
+
+        let dailyBtn  = makeModeButton(.dailyQuests)
+        let guildBtn  = makeModeButton(.guildQuests)
+        let potionBtn = makeModeButton(.autoPotion)
+        modeRow2.addArrangedSubview(dailyBtn)
+        modeRow2.addArrangedSubview(guildBtn)
+        modeRow2.addArrangedSubview(potionBtn)
+        stack.addArrangedSubview(modeRow2)
+        modeRow2.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
+
+        updateModeHighlights()
+
+        // ── Separator ────────────────────────────────────────────────────
+        stack.addArrangedSubview(makeSeparator())
+
+        // ── Section: Control Buttons ─────────────────────────────────────
         let btnRow = NSStackView()
         btnRow.orientation = .horizontal
         btnRow.spacing     = 8
@@ -187,7 +251,7 @@ final class DashboardPanel: NSObject {
         }
         stack.addArrangedSubview(btnRow)
 
-        // Log scroll view
+        // ── Section: Log Output ──────────────────────────────────────────
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller  = true
         scrollView.autohidesScrollers   = true
@@ -207,8 +271,10 @@ final class DashboardPanel: NSObject {
 
         stack.addArrangedSubview(scrollView)
         scrollView.widthAnchor .constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
-        scrollView.heightAnchor.constraint(equalToConstant: 220).isActive = true
+        scrollView.heightAnchor.constraint(equalToConstant: 200).isActive = true
     }
+
+    // MARK: - UI factory helpers
 
     private func makeLabel(_ text: String, size: CGFloat, bold: Bool = false) -> NSTextField {
         let lbl = NSTextField(labelWithString: text)
@@ -216,5 +282,21 @@ final class DashboardPanel: NSObject {
         lbl.lineBreakMode = .byWordWrapping
         lbl.maximumNumberOfLines = 2
         return lbl
+    }
+
+    private func makeSeparator() -> NSBox {
+        let sep = NSBox()
+        sep.boxType = .separator
+        return sep
+    }
+
+    private func makeModeButton(_ mode: AutomationMode) -> NSButton {
+        let btn = NSButton(title: "\(mode.icon) \(mode.rawValue)", target: self, action: #selector(modePressed(_:)))
+        btn.identifier = NSUserInterfaceItemIdentifier(mode.rawValue)
+        btn.bezelStyle = .rounded
+        btn.font       = NSFont.systemFont(ofSize: 10)
+        btn.setButtonType(.momentaryPushIn)
+        modeButtons[mode] = btn
+        return btn
     }
 }
