@@ -29,6 +29,8 @@ enum ScanAction: CustomStringConvertible {
     case titleScreen(cx: Int, cy: Int)
     case pathfinding
     case dialog(cx: Int, cy: Int, label: String)
+    /// Dismiss a blocking popup (×, Close button, etc.) — not subject to normal dedup.
+    case dismiss(cx: Int, cy: Int, label: String)
     case interact(cx: Int, cy: Int, label: String)
     case action(cx: Int, cy: Int, label: String)
     case navigate(cx: Int, cy: Int, label: String)
@@ -39,6 +41,7 @@ enum ScanAction: CustomStringConvertible {
         case .titleScreen(let x, let y):        return "titleScreen(\(x),\(y))"
         case .pathfinding:                      return "pathfinding"
         case .dialog(let x, let y, let l):      return "dialog(\(x),\(y)) '\(l)'"
+        case .dismiss(let x, let y, let l):     return "dismiss(\(x),\(y)) '\(l)'"
         case .interact(let x, let y, let l):    return "interact(\(x),\(y)) '\(l)'"
         case .action(let x, let y, let l):      return "action(\(x),\(y)) '\(l)'"
         case .navigate(let x, let y, let l):    return "navigate(\(x),\(y)) '\(l)'"
@@ -50,6 +53,7 @@ enum ScanAction: CustomStringConvertible {
         switch self {
         case .titleScreen(let x, let y),
              .dialog(let x, let y, _),
+             .dismiss(let x, let y, _),
              .interact(let x, let y, _),
              .action(let x, let y, _),
              .navigate(let x, let y, _):

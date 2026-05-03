@@ -38,6 +38,12 @@ struct QuestScanner {
             return (quest, .pathfinding)
         }
 
+        // ── Step 0.5: Dismiss blocking popup (×, Close) ───────────────────
+        // Must run before dialog so a stray "Close" popup doesn't eat dialog turns.
+        if let action = dismissButton(regions) {
+            return (quest, action)
+        }
+
         // ── Step 1: Dialog / conversation choice button ────────────────────
         if let action = dialogButton(regions) {
             return (quest, action)
@@ -95,6 +101,21 @@ struct QuestScanner {
         return state
     }
 
+    // MARK: - Step 0.5 – dismiss blocking popups
+
+    private static func dismissButton(_ regions: [TextRegion]) -> ScanAction? {
+        // Close buttons are always top-right (cx > 500) and in the upper half (cy < 500).
+        // This prevents matching an NPC "Close" dialog response in the lower game world.
+        for pattern in Patterns.dismiss {
+            if let r = OCREngine.find(regions, pattern: pattern, minConfidence: confDialog),
+               r.cx > 500,
+               r.cy < 500 {
+                return .dismiss(cx: r.cx, cy: r.cy, label: r.text)
+            }
+        }
+        return nil
+    }
+
     // MARK: - Step 1 – dialog buttons
 
     private static func dialogButton(_ regions: [TextRegion]) -> ScanAction? {
@@ -104,7 +125,7 @@ struct QuestScanner {
             return .dialog(cx: r.cx, cy: r.cy, label: r.text)
         }
 
-        // Named choice buttons — must be below HUD top and above dialog zone end
+        // Unambiguous choice buttons — below HUD top and above dialog zone end
         for pattern in Patterns.dialogChoice {
             if let r = OCREngine.find(regions, pattern: pattern, minConfidence: confDialog),
                r.cx > Zones.questPanelXMax,
@@ -113,6 +134,18 @@ struct QuestScanner {
                 return .dialog(cx: r.cx, cy: r.cy, label: r.text)
             }
         }
+
+        // Ambiguous words (Accept, Start, Receive, Finish) — require extra vertical guard
+        // to avoid matching HUD buttons which sit above y=400.
+        for pattern in Patterns.dialogChoiceAmbiguous {
+            if let r = OCREngine.find(regions, pattern: pattern, minConfidence: confDialog),
+               r.cx > Zones.questPanelXMax,
+               r.cy > 400,
+               r.cy < Zones.dialogYMax {
+                return .dialog(cx: r.cx, cy: r.cy, label: r.text)
+            }
+        }
+
         return nil
     }
 

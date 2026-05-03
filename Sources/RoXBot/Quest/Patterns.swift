@@ -37,9 +37,8 @@ enum Patterns {
     static let skip = #"\bSkip\b"#
 
     // Dialog choice buttons — words that appear ONLY as NPC dialog response buttons.
-    // Generic words (Close, Done, Start, Return, Accept, Receive, Claim) removed from here
-    // because they appear in HUD menus, inventory, and quest panels causing false clicks.
-    // Those are allowed only as action buttons (step 3) where zone checks are stricter.
+    // "Accept" and "Start" are in `dialogChoiceAmbiguous` — the scanner applies a stricter
+    // zone guard (cy > 400) for those to avoid HUD false-positives.
     static let dialogChoice: [String] = [
         #"Inquir"#,
         #"\bNext\b"#,
@@ -52,6 +51,26 @@ enum Patterns {
         #"\bBye\b"#,
         #"\bConfirm\b"#,
         #"Let.s\s*go"#,
+        // Death / resurrection recovery
+        #"\bRevive\b"#,
+        #"Resurrect"#,
+        #"Return\s+to\s+Town"#,
+    ]
+
+    // Ambiguous dialog words — valid quest accept/start buttons but also appear in HUD menus.
+    // Scanner applies extra zone guard: cy > 400 && cy < dialogYMax.
+    static let dialogChoiceAmbiguous: [String] = [
+        #"\bAccept\b"#,
+        #"\bStart\b"#,
+        #"\bReceive\b"#,
+        #"\bFinish\b"#,
+    ]
+
+    // MARK: - Dismiss / close buttons
+    // Strict zone required: cx > 500 && cy < 500 (top-right close buttons on popups).
+    static let dismiss: [String] = [
+        #"[×✕✖]"#,
+        #"\bClose\b"#,
     ]
 
     // MARK: - Action buttons (game world)

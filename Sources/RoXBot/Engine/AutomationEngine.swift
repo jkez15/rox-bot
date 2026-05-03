@@ -168,6 +168,12 @@ final class AutomationEngine {
             await ClickEngine.click(wx: cx, wy: cy, windowBounds: bounds)
             dashboard.incrementActions()
 
+        case .dismiss(let cx, let cy, let label):
+            dashboard.setAction("✖ Dismiss: \(label)")
+            dashboard.log("✖ Dismiss '\(label)' @ (\(cx),\(cy))")
+            await ClickEngine.click(wx: cx, wy: cy, windowBounds: bounds)
+            dashboard.incrementActions()
+
         case .interact(let cx, let cy, let label):
             dashboard.setAction("🖱 Interact: \(label)")
             dashboard.log("🖱 Interact '\(label)' @ (\(cx),\(cy))")
