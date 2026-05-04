@@ -33,18 +33,22 @@ enum Patterns {
     // Generic English words (Open, Read, Look, Search, Press, Pull, Push) are removed
     // because they appear in item tooltips, map labels, and chat — causing false clicks.
     static let interaction: [String] = [
-        #"[Ee]xamin"#,
-        #"[Ii1]nspect"#,
-        #"\bTalk\b"#,
-        #"[Ii1]nvestigat"#,
-        #"[Ii1]nquir"#,
-        #"\bDisguis"#,
-        #"\bInteract\b"#,
-        #"\bApproach\b"#,
-        #"\bGreet\b"#,
-        #"\bOperat"#,
-        #"\bProbe\b"#,
-        #"\bTouch\b"#,
+        #"[Ee]xamin"#,         // Examine — magnifying glass icon
+        #"[Ii1]nspect"#,       // Inspect
+        #"\bTalk\b"#,           // Talk
+        #"[Ii1]nvestigat"#,    // Investigate
+        #"[Ii1]nquir"#,        // Inquire (when on NPC, not dialog)
+        #"\bDisguis"#,          // Disguise
+        #"\bInteract\b"#,       // Interact
+        #"\bApproach\b"#,       // Approach
+        #"\bGreet\b"#,          // Greet
+        #"\bOperat"#,           // Operate
+        #"\bProbe\b"#,          // Probe
+        #"\bTouch\b"#,          // Touch
+        #"\bObserv"#,           // Observe
+        #"\bSurvey\b"#,         // Survey
+        #"\bQuestion\b"#,       // Question (NPC interaction)
+        #"\bPatrol\b"#,         // Patrol point
     ]
 
     // MARK: - Dialog control buttons

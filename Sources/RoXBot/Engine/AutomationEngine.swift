@@ -228,22 +228,32 @@ final class AutomationEngine {
     ///
     /// The HP bar is ~red pixels, SP bar is ~blue pixels, within the top-left HUD region.
     /// Fill ratio = (filled pixels) / (total pixels in bar rectangle).
+    ///
+    /// **Only fires in `.autoPotion` mode** to prevent phantom potion use caused by
+    /// inaccurate bar-region sampling (wrong coordinates, HUD not visible, loading screens).
+    /// In other modes a critical-HP emergency threshold (25%) still fires.
     private func checkPotionNeeded(image: CGImage, mode: AutomationMode) -> ScanAction? {
-        // Always check potions regardless of mode — healing is always needed.
+        // In modes other than autoPotion, only intervene at critically low HP.
+        let hpThreshold: Float = mode == .autoPotion ? Zones.hpPotionThreshold : 0.25
+        let spThreshold: Float = mode == .autoPotion ? Zones.spPotionThreshold : 0.15
+
         let hpFill = barFillRatio(image: image,
                                    x1: Zones.hpBarX1, y1: Zones.hpBarY1,
                                    x2: Zones.hpBarX2, y2: Zones.hpBarY2,
                                    channel: .red)
-        if let fill = hpFill, fill < Zones.hpPotionThreshold {
+        if let fill = hpFill, fill < hpThreshold {
             print("[Engine] HP bar at \(Int(fill * 100))% — using HP potion")
             return .usePotion(kind: .hp)
         }
+
+        // Only check SP in autoPotion mode — SP potions during quests are rarely needed.
+        guard mode == .autoPotion else { return nil }
 
         let spFill = barFillRatio(image: image,
                                    x1: Zones.spBarX1, y1: Zones.spBarY1,
                                    x2: Zones.spBarX2, y2: Zones.spBarY2,
                                    channel: .blue)
-        if let fill = spFill, fill < Zones.spPotionThreshold {
+        if let fill = spFill, fill < spThreshold {
             print("[Engine] SP bar at \(Int(fill * 100))% — using SP potion")
             return .usePotion(kind: .sp)
         }
@@ -284,12 +294,17 @@ final class AutomationEngine {
         ctx.draw(cropped, in: CGRect(x: 0, y: 0, width: bw, height: bh))
 
         var litCount = 0
+        var visibleCount = 0
         let total = bw * bh
         for i in 0..<total {
             let base = i * bytesPerPixel
             let r = Int(pixelData[base])
             let g = Int(pixelData[base + 1])
             let b = Int(pixelData[base + 2])
+            // Count pixels with any visible colour (not dark background).
+            let brightness = r + g + b
+            if brightness > 80 { visibleCount += 1 }
+
             switch channel {
             case .red:
                 // HP bar: red dominant (r > 100, r > g+40, r > b+40)
@@ -298,6 +313,14 @@ final class AutomationEngine {
                 // SP bar: blue dominant (b > 80, b > r+30, b > g+10)
                 if b > 80 && b > r + 30 && b > g + 10 { litCount += 1 }
             }
+        }
+
+        // Sanity check: the sampled region must contain a meaningful number of
+        // visible (non-dark) pixels. If < 15% are visible the HUD bar isn't in
+        // this region (loading screen, wrong coordinates, etc.) → inconclusive.
+        let visibleRatio = Float(visibleCount) / Float(max(total, 1))
+        if visibleRatio < 0.15 {
+            return nil   // region is mostly dark — no bar detected
         }
 
         return Float(litCount) / Float(max(total, 1))

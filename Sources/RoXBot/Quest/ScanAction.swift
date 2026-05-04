@@ -41,14 +41,12 @@ struct QuestState {
     var stepText: String  = ""
     var distance: Int?    = nil
 
-    /// True when the sidebar shows a distance and it's ≤ this threshold (units).
-    /// At distance 0 the NPC should be right next to the character.
-    /// True when the sidebar shows a non-zero distance ≤ 5 m.
-    /// At distance 0 we deliberately return false — the bot re-taps the quest row to
-    /// immediately trigger NPC interaction instead of waiting for the next scan cycle.
+    /// True when the sidebar shows a distance ≤ 5 m (including 0).
+    /// At distance 0 the NPC is right next to the character — the interaction button
+    /// should be visible. Don't re-tap the quest row; wait for the interaction scan.
     var isAtTarget: Bool {
         guard let d = distance else { return false }
-        return d >= 1 && d <= 5
+        return d <= 5
     }
     var hasActiveQuest: Bool { !title.isEmpty }
 }

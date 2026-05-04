@@ -241,9 +241,11 @@ struct QuestScanner {
                 let r = OCREngine.find(regions, pattern: pattern, minConfidence: confButton),
                 Zones.isGameWorld(cx: r.cx, cy: r.cy)
             else { continue }
-            // The visible icon floats ABOVE the label in RöX — click ~2 label-heights up
-            let iconY = max(r.cy - max(30, r.height * 2), Zones.hudTopYMax + 10)
-            return .interact(cx: r.cx, cy: iconY, label: r.text)
+            // The NPC sign in RöX is a combined icon+text element.  The interactive
+            // hit area covers both the icon (above) and the label (below).  Click the
+            // label centre — this is always within the sign's tap region and avoids
+            // overshooting into the HUD when the icon offset lands outside game world.
+            return .interact(cx: r.cx, cy: r.cy, label: r.text)
         }
         return nil
     }
