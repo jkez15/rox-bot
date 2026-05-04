@@ -33,22 +33,25 @@ enum Patterns {
     // Generic English words (Open, Read, Look, Search, Press, Pull, Push) are removed
     // because they appear in item tooltips, map labels, and chat — causing false clicks.
     static let interaction: [String] = [
-        #"[Ee]xamin"#,         // Examine — magnifying glass icon
-        #"[Ii1]nspect"#,       // Inspect
-        #"\bTalk\b"#,           // Talk
-        #"[Ii1]nvestigat"#,    // Investigate
-        #"[Ii1]nquir"#,        // Inquire (when on NPC, not dialog)
-        #"\bDisguis"#,          // Disguise
-        #"\bInteract\b"#,       // Interact
-        #"\bApproach\b"#,       // Approach
-        #"\bGreet\b"#,          // Greet
-        #"\bOperat"#,           // Operate
-        #"\bProbe\b"#,          // Probe
-        #"\bTouch\b"#,          // Touch
-        #"\bObserv"#,           // Observe
-        #"\bSurvey\b"#,         // Survey
-        #"\bQuestion\b"#,       // Question (NPC interaction)
-        #"\bPatrol\b"#,         // Patrol point
+        #"[Ee]xamin"#,         // Examine / Examiné / Examing (OCR variants)
+        #"[Ii1l][Nn]spect"#,   // Inspect (l misread as I)
+        #"\bTalk\b"#,
+        #"[Ii1l][Nn]vestigat"#, // Investigate
+        #"[Ii1l][Nn]quir"#,    // Inquire
+        #"\bDisguis"#,
+        #"\bInteract\b"#,
+        #"\bApproach\b"#,
+        #"\bGreet\b"#,
+        #"\bOperat"#,
+        #"\bProbe\b"#,
+        #"\bTouch\b"#,
+        #"\bObserv"#,
+        #"\bSurvey\b"#,
+        #"\bQuestion\b"#,
+        #"\bPatrol\b"#,
+        // Extra OCR noise variants — Vision sometimes produces these for Examine
+        #"[Ee]xam[il1]n"#,     // Examin with i/l/1 confusion
+        #"[Ee]xamne"#,         // Examne (dropped i)
     ]
 
     // MARK: - Dialog control buttons

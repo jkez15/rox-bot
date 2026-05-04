@@ -12,9 +12,9 @@ import Foundation
 ///   5. Quest row in sidebar                    → tap to set nav target
 struct QuestScanner {
 
-    private static let confButton:  Float = 0.50
-    private static let confAction:  Float = 0.45
-    private static let confDialog:  Float = 0.40
+    private static let confButton:  Float = 0.35   // styled game UI text scores 0.30–0.45
+    private static let confAction:  Float = 0.35
+    private static let confDialog:  Float = 0.35
     private static let confSidebar: Float = 0.30
 
     // MARK: - Main entry
@@ -88,6 +88,8 @@ struct QuestScanner {
             return (quest, action)
         }
 
+        // Debug: dump all OCR regions when no action found — helps calibrate patterns
+        print("[Scanner] no-action regions (\(regions.count)): \(regions.map { "'\($0.text)'@(\($0.cx),\($0.cy))c\(String(format: "%.2f", $0.confidence))" }.joined(separator: " | "))")
         return (quest, .none)
     }
 
@@ -237,14 +239,19 @@ struct QuestScanner {
 
     private static func interactionButton(_ regions: [TextRegion]) -> ScanAction? {
         for pattern in Patterns.interaction {
-            guard
-                let r = OCREngine.find(regions, pattern: pattern, minConfidence: confButton),
-                Zones.isGameWorld(cx: r.cx, cy: r.cy)
+            guard let r = OCREngine.find(regions, pattern: pattern, minConfidence: confButton)
             else { continue }
-            // The NPC sign in RöX is a combined icon+text element.  The interactive
-            // hit area covers both the icon (above) and the label (below).  Click the
-            // label centre — this is always within the sign's tap region and avoids
-            // overshooting into the HUD when the icon offset lands outside game world.
+            // Zone: must be outside sidebar and below y=250 (not HUD bars).
+            // Deliberately wider than isGameWorld (which uses cy>300) because the NPC
+            // sign label sometimes appears at y≈260–290 near the top game edge.
+            guard r.cx > Zones.questPanelXMax,
+                  r.cy > 250,
+                  r.cy < Zones.gameWorldYMax
+            else {
+                print("[Scanner] interaction '\(r.text)' conf=\(r.confidence) rejected zone cx=\(r.cx) cy=\(r.cy)")
+                continue
+            }
+            print("[Scanner] ✅ interact '\(r.text)' conf=\(r.confidence) cx=\(r.cx) cy=\(r.cy)")
             return .interact(cx: r.cx, cy: r.cy, label: r.text)
         }
         return nil
