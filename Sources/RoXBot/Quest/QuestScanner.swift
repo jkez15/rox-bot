@@ -251,8 +251,10 @@ struct QuestScanner {
                 print("[Scanner] interaction '\(r.text)' conf=\(r.confidence) rejected zone cx=\(r.cx) cy=\(r.cy)")
                 continue
             }
-            print("[Scanner] ✅ interact '\(r.text)' conf=\(r.confidence) cx=\(r.cx) cy=\(r.cy)")
-            return .interact(cx: r.cx, cy: r.cy, label: r.text)
+            // Click ~60 px above the text label — that's where the icon hitbox sits in RöX.
+            let clickY = max(r.cy - 60, Zones.hudTopYMax + 5)
+            print("[Scanner] ✅ interact '\(r.text)' conf=\(r.confidence) cx=\(r.cx) labelY=\(r.cy) clickY=\(clickY)")
+            return .interact(cx: r.cx, cy: clickY, label: r.text)
         }
         return nil
     }
