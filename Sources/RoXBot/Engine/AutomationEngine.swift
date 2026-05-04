@@ -226,34 +226,32 @@ final class AutomationEngine {
     /// Reads the HP and SP bars from the captured frame and returns a `.usePotion` action
     /// if either bar is below its threshold. Returns nil if both bars are fine.
     ///
-    /// The HP bar is ~red pixels, SP bar is ~blue pixels, within the top-left HUD region.
-    /// Fill ratio = (filled pixels) / (total pixels in bar rectangle).
-    ///
-    /// **Only fires in `.autoPotion` mode** to prevent phantom potion use caused by
-    /// inaccurate bar-region sampling (wrong coordinates, HUD not visible, loading screens).
-    /// In other modes a critical-HP emergency threshold (25%) still fires.
+    /// **ONLY fires in `.autoPotion` mode.** Potion use is completely suppressed in all
+    /// other modes (mainQuest, dailyQuests, etc.) because the bar coordinates in Zones.swift
+    /// are estimates that must be calibrated per-machine before use. If the coordinates are
+    /// wrong, barFillRatio returns 0.0 (no colored pixels found) which always looks like
+    /// "critically low" and would spam the hotkey every frame.
     private func checkPotionNeeded(image: CGImage, mode: AutomationMode) -> ScanAction? {
-        // In modes other than autoPotion, only intervene at critically low HP.
-        let hpThreshold: Float = mode == .autoPotion ? Zones.hpPotionThreshold : 0.25
-        let spThreshold: Float = mode == .autoPotion ? Zones.spPotionThreshold : 0.15
+        // Hard gate: do nothing unless the user has explicitly selected Auto-Potion mode.
+        guard mode == .autoPotion else { return nil }
 
         let hpFill = barFillRatio(image: image,
                                    x1: Zones.hpBarX1, y1: Zones.hpBarY1,
                                    x2: Zones.hpBarX2, y2: Zones.hpBarY2,
                                    channel: .red)
-        if let fill = hpFill, fill < hpThreshold {
+        // Sanity: fill == 0.0 means no red pixels at all — bar coords are wrong or HUD is
+        // hidden (loading screen, cutscene). Skip rather than false-fire.
+        if let fill = hpFill, fill > 0.02, fill < Zones.hpPotionThreshold {
             print("[Engine] HP bar at \(Int(fill * 100))% — using HP potion")
             return .usePotion(kind: .hp)
         }
 
-        // Only check SP in autoPotion mode — SP potions during quests are rarely needed.
-        guard mode == .autoPotion else { return nil }
-
+        // SP potion
         let spFill = barFillRatio(image: image,
                                    x1: Zones.spBarX1, y1: Zones.spBarY1,
                                    x2: Zones.spBarX2, y2: Zones.spBarY2,
                                    channel: .blue)
-        if let fill = spFill, fill < spThreshold {
+        if let fill = spFill, fill > 0.02, fill < Zones.spPotionThreshold {
             print("[Engine] SP bar at \(Int(fill * 100))% — using SP potion")
             return .usePotion(kind: .sp)
         }
