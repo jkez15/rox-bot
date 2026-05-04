@@ -255,11 +255,10 @@ struct QuestScanner {
             // with NO click handlers.  The game uses Physics.Raycast against the NPC's
             // 3D model collider to detect clicks (GameInputManager.On_TouchUp → PickNpc).
             //
-            // The sign floats above the NPC's head, so the model is BELOW the text.
-            // Click below the text label to hit the NPC body:
-            //   - offset down by ~3–5× label height (model center is well below sign)
-            //   - clamp so we stay inside the game-world zone
-            let downOffset = max(60, r.height * 4)
+            // The sign floats well above the NPC's head.  On a 320 px-tall game world
+            // (y 300–620) the model body centre is typically 120–180 px below the sign.
+            // Primary click target = sign + 130 px (torso), clamped to game world.
+            let downOffset = 130
             let clickY     = min(r.cy + downOffset, Zones.gameWorldYMax - 10)
             print("[Scanner] ✅ interact '\(r.text)' conf=\(r.confidence) cx=\(r.cx) labelY=\(r.cy) h=\(r.height) clickY=\(clickY)")
             return .interact(cx: r.cx, cy: clickY, label: r.text, labelY: r.cy)

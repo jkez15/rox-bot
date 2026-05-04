@@ -209,29 +209,37 @@ final class AutomationEngine {
         case .interact(let cx, let cy, let label, let labelY):
             // The NPC sign is display-only — the game picks NPCs via Physics.Raycast
             // against the 3D model collider.  The model sits BELOW the floating sign.
-            // We fire a 3-click burst at different heights to maximise hit chance:
-            //   1. Primary: below the sign text (estimated NPC body centre)
-            //   2. Further below: lower on the model
-            //   3. On the sign text itself: in case the sign has a UI GraphicRaycaster
-            //      that routes back into the same On_TouchUp handler
-            let mid = (cy + labelY) / 2   // halfway between primary click and label
-            let furtherDown = min(cy + 40, Zones.gameWorldYMax - 5)
-            dashboard.setAction("🖱 Interact: \(label)")
-            dashboard.log("🖱 Interact '\(label)' body@(\(cx),\(cy)) further@(\(cx),\(furtherDown)) label@(\(cx),\(labelY))")
+            //
+            // On a 320 px-tall game world (y 300–620) the sign-to-feet distance is
+            // ~200 px.  We fan 5 clicks across the full vertical range below the sign
+            // to guarantee at least one hits the 3D collider:
+            //   • cy        = sign + 130 px  (chest / primary)
+            //   • cy + 50   = sign + 180 px  (waist / legs)
+            //   • cy - 40   = sign +  90 px  (head / upper body)
+            //   • labelY + 30 = just below sign text (in case sign IS clickable)
+            //   • labelY     = on the sign text itself
+            let waist = min(cy + 50, Zones.gameWorldYMax - 5)
+            let upper = max(cy - 40, Zones.hudTopYMax + 5)
+            let belowSign = min(labelY + 30, Zones.gameWorldYMax - 5)
 
-            // Record this attempt for calibrator learning
+            dashboard.setAction("🖱 Interact: \(label)")
+            dashboard.log("🖱 Interact '\(label)' labelY=\(labelY)  clicks: \(upper),\(cy),\(waist),\(belowSign),\(labelY)")
+
+            // Record attempt for calibrator learning
             await ClickCalibrator.shared.recordAttempt(
                 label: label, cx: cx, labelY: labelY,
                 offsetUsed: cy - labelY, frameNumber: frameNumber
             )
 
-            // Click 1 — NPC body (primary)
+            // 5-click fan from upper body to sign text
             await ClickEngine.click(wx: cx, wy: cy, windowBounds: bounds)
-            try? await Task.sleep(for: .milliseconds(300))
-            // Click 2 — further down the model
-            await ClickEngine.click(wx: cx, wy: furtherDown, windowBounds: bounds)
-            try? await Task.sleep(for: .milliseconds(300))
-            // Click 3 — on the sign text (fallback)
+            try? await Task.sleep(for: .milliseconds(200))
+            await ClickEngine.click(wx: cx, wy: waist, windowBounds: bounds)
+            try? await Task.sleep(for: .milliseconds(200))
+            await ClickEngine.click(wx: cx, wy: upper, windowBounds: bounds)
+            try? await Task.sleep(for: .milliseconds(200))
+            await ClickEngine.click(wx: cx, wy: belowSign, windowBounds: bounds)
+            try? await Task.sleep(for: .milliseconds(200))
             await ClickEngine.click(wx: cx, wy: labelY, windowBounds: bounds)
             dashboard.incrementActions()
 
