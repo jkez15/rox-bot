@@ -251,15 +251,18 @@ struct QuestScanner {
                 print("[Scanner] interaction '\(r.text)' conf=\(r.confidence) rejected zone cx=\(r.cx) cy=\(r.cy)")
                 continue
             }
-            // The OCR region is the TEXT LABEL at the bottom of the NPC sign card.
-            // The tappable icon sits above it. In RöX the icon is roughly 3–4× the
-            // label's own height above the label baseline — scale with r.height so this
-            // works at any window size / zoom level.
-            // Minimum offset 80 px; maximum clamped to just below the HUD top bar.
-            let offset   = max(80, r.height * 4)
-            let clickY   = max(r.cy - offset, Zones.hudTopYMax + 5)
+            // IMPORTANT: The NPC sign (icon + text label) is a DISPLAY-ONLY UI element
+            // with NO click handlers.  The game uses Physics.Raycast against the NPC's
+            // 3D model collider to detect clicks (GameInputManager.On_TouchUp → PickNpc).
+            //
+            // The sign floats above the NPC's head, so the model is BELOW the text.
+            // Click below the text label to hit the NPC body:
+            //   - offset down by ~3–5× label height (model center is well below sign)
+            //   - clamp so we stay inside the game-world zone
+            let downOffset = max(60, r.height * 4)
+            let clickY     = min(r.cy + downOffset, Zones.gameWorldYMax - 10)
             print("[Scanner] ✅ interact '\(r.text)' conf=\(r.confidence) cx=\(r.cx) labelY=\(r.cy) h=\(r.height) clickY=\(clickY)")
-            return .interact(cx: r.cx, cy: clickY, label: r.text)
+            return .interact(cx: r.cx, cy: clickY, label: r.text, labelY: r.cy)
         }
         return nil
     }

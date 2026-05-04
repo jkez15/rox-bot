@@ -70,7 +70,9 @@ enum ScanAction: CustomStringConvertible {
     case dialog(cx: Int, cy: Int, label: String)
     /// Dismiss a blocking popup (×, Close button, etc.) — not subject to normal dedup.
     case dismiss(cx: Int, cy: Int, label: String)
-    case interact(cx: Int, cy: Int, label: String)
+    /// NPC interaction: `cy` is the primary click target (NPC body estimate),
+    /// `labelY` is where OCR found the sign text — used for fallback clicks.
+    case interact(cx: Int, cy: Int, label: String, labelY: Int)
     case action(cx: Int, cy: Int, label: String)
     case navigate(cx: Int, cy: Int, label: String)
     /// Press a potion hotkey (no click coords — sends a CGEvent keypress).
@@ -88,7 +90,7 @@ enum ScanAction: CustomStringConvertible {
         case .pathfinding:                      return "pathfinding"
         case .dialog(let x, let y, let l):      return "dialog(\(x),\(y)) '\(l)'"
         case .dismiss(let x, let y, let l):     return "dismiss(\(x),\(y)) '\(l)'"
-        case .interact(let x, let y, let l):    return "interact(\(x),\(y)) '\(l)'"
+        case .interact(let x, let y, let l, let ly): return "interact(\(x),\(y)) label@\(ly) '\(l)'"
         case .action(let x, let y, let l):      return "action(\(x),\(y)) '\(l)'"
         case .navigate(let x, let y, let l):    return "navigate(\(x),\(y)) '\(l)'"
         case .usePotion(let k):                 return "usePotion(\(k.rawValue))"
@@ -101,7 +103,7 @@ enum ScanAction: CustomStringConvertible {
         case .titleScreen(let x, let y),
              .dialog(let x, let y, _),
              .dismiss(let x, let y, _),
-             .interact(let x, let y, _),
+             .interact(let x, let y, _, _),
              .action(let x, let y, _),
              .navigate(let x, let y, _):
             return (x, y)

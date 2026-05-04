@@ -176,6 +176,10 @@ enum Patterns {
 
     // MARK: - Helpers
 
+    /// Broad pattern that matches any dialog/conversation text — used by ClickCalibrator
+    /// to detect whether a click triggered a state change (NPC dialog opened).
+    static let anyDialogOrInteraction = #"\\bNext\\b|\\bOK\\b|\\bOk\\b|\\bYes\\b|\\bAgree\\b|Got\\s*it|\\bBye\\b|\\bConfirm\\b|\\bAccept\\b|\\bSkip\\b|Continu"#
+
     static func matches(_ text: String, pattern: String) -> Bool {
         (try? NSRegularExpression(pattern: pattern, options: .caseInsensitive))?
             .firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil

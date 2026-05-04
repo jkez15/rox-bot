@@ -17,6 +17,9 @@ final class AutomationEngine {
     private let pipeline   = FramePipeline()
     private let queue      = ActionQueue()
     private var running    = true
+    private var frameNumber = 0
+    /// Tracks whether the previous frame had an active dialog (for calibrator feedback).
+    private var prevHadDialog = false
 
     init(dashboard: DashboardPanel) {
         self.dashboard = dashboard
@@ -29,6 +32,7 @@ final class AutomationEngine {
         GameKnowledge.shared.load()
         CommissionData.shared.load()
         LogMonitor.shared.startMonitoring()
+        await ClickCalibrator.shared.loadFromDisk()
 
         // Check Accessibility permission — required for CGEventPostToPid to work
         let trusted = AXIsProcessTrusted()
@@ -54,7 +58,10 @@ final class AutomationEngine {
 
     func stop() {
         running = false
-        Task { await pipeline.stop() }
+        Task {
+            await pipeline.stop()
+            await ClickCalibrator.shared.saveToDisk()
+        }
     }
 
     // MARK: - Pipeline lifecycle (restart on game close/reopen)
@@ -110,10 +117,18 @@ final class AutomationEngine {
         guard !dashboard.paused, !dashboard.stopRequested else { return }
 
         dashboard.incrementCycle()
+        frameNumber += 1
 
         // 1. OCR — runs on a detached background task, releases main actor
         let regions = await OCREngine.recognize(image, minConfidence: 0.30)
         print("[Engine] OCR found \(regions.count) regions: \(regions.prefix(5).map(\.text))")
+
+        // 1a. Calibrator feedback: did the previous interact click produce a state change?
+        let hasDialogNow = OCREngine.find(regions, pattern: Patterns.anyDialogOrInteraction,
+                                           minConfidence: 0.35) != nil
+        let stateChanged = !prevHadDialog && hasDialogNow
+        await ClickCalibrator.shared.evaluateResult(stateChanged: stateChanged, currentFrame: frameNumber)
+        prevHadDialog = hasDialogNow
 
         // 1b. Auto-potion — pixel-based HP/SP check (runs in autoPotion mode OR always)
         let potionAction = checkPotionNeeded(image: image, mode: dashboard.selectedMode)
@@ -191,10 +206,33 @@ final class AutomationEngine {
             await ClickEngine.click(wx: cx, wy: cy, windowBounds: bounds)
             dashboard.incrementActions()
 
-        case .interact(let cx, let cy, let label):
+        case .interact(let cx, let cy, let label, let labelY):
+            // The NPC sign is display-only — the game picks NPCs via Physics.Raycast
+            // against the 3D model collider.  The model sits BELOW the floating sign.
+            // We fire a 3-click burst at different heights to maximise hit chance:
+            //   1. Primary: below the sign text (estimated NPC body centre)
+            //   2. Further below: lower on the model
+            //   3. On the sign text itself: in case the sign has a UI GraphicRaycaster
+            //      that routes back into the same On_TouchUp handler
+            let mid = (cy + labelY) / 2   // halfway between primary click and label
+            let furtherDown = min(cy + 40, Zones.gameWorldYMax - 5)
             dashboard.setAction("🖱 Interact: \(label)")
-            dashboard.log("🖱 Interact '\(label)' @ (\(cx),\(cy))")
+            dashboard.log("🖱 Interact '\(label)' body@(\(cx),\(cy)) further@(\(cx),\(furtherDown)) label@(\(cx),\(labelY))")
+
+            // Record this attempt for calibrator learning
+            await ClickCalibrator.shared.recordAttempt(
+                label: label, cx: cx, labelY: labelY,
+                offsetUsed: cy - labelY, frameNumber: frameNumber
+            )
+
+            // Click 1 — NPC body (primary)
             await ClickEngine.click(wx: cx, wy: cy, windowBounds: bounds)
+            try? await Task.sleep(for: .milliseconds(300))
+            // Click 2 — further down the model
+            await ClickEngine.click(wx: cx, wy: furtherDown, windowBounds: bounds)
+            try? await Task.sleep(for: .milliseconds(300))
+            // Click 3 — on the sign text (fallback)
+            await ClickEngine.click(wx: cx, wy: labelY, windowBounds: bounds)
             dashboard.incrementActions()
 
         case .action(let cx, let cy, let label):

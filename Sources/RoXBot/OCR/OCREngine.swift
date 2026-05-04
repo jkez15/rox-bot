@@ -53,6 +53,24 @@ struct OCREngine {
         request.usesLanguageCorrection = false          // preserve game text like [Main]
         request.recognitionLanguages   = ["en-US"]
 
+        // Use the latest available revision for best recognition of stylised game text.
+        // Revision 3 (macOS 14+) has significantly better accuracy on decorative fonts.
+        if #available(macOS 14, *) {
+            request.revision = VNRecognizeTextRequestRevision3
+        }
+
+        // Request multiple candidates — the top-1 may miss a word but top-2 catches it.
+        // This feeds into `find()` which only uses the top candidate per observation,
+        // but having 2 candidates lets us fall back on the next-best later if needed.
+        request.customWords = [
+            "Examine", "Inspect", "Investigate", "Inquire", "Talk",
+            "Interact", "Approach", "Greet", "Operate", "Probe", "Touch",
+            "Observe", "Survey", "Question", "Patrol", "Disguise",
+            "Next", "OK", "Yes", "Agree", "Continue", "Skip", "Accept",
+            "Collect", "Deliver", "Report", "Complete", "Enter", "Activate",
+            "Pathfinding", "Main", "Sub", "Daily", "Guild",
+        ]
+
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
         do {
             try handler.perform([request])
