@@ -251,16 +251,17 @@ struct QuestScanner {
                 print("[Scanner] interaction '\(r.text)' conf=\(r.confidence) rejected zone cx=\(r.cx) cy=\(r.cy)")
                 continue
             }
-            // IMPORTANT: The NPC sign (icon + text label) is a DISPLAY-ONLY UI element
-            // with NO click handlers.  The game uses Physics.Raycast against the NPC's
-            // 3D model collider to detect clicks (GameInputManager.On_TouchUp → PickNpc).
+            // From the screenshot reference (templates/Screenshot 2026-05-05):
+            // The NPC sign is a tall golden card with the icon (magnifying glass)
+            // in the CENTER of the card and the text label at the BOTTOM.
+            // At Retina 2× the icon centre is ~65 raw px above text = ~33 logical px.
+            // The full card height is ~120 raw px = ~60 logical px.
             //
-            // The sign floats well above the NPC's head.  On a 320 px-tall game world
-            // (y 300–620) the model body centre is typically 120–180 px below the sign.
-            // Primary click target = sign + 130 px (torso), clamped to game world.
-            let downOffset = 130
-            let clickY     = min(r.cy + downOffset, Zones.gameWorldYMax - 10)
-            print("[Scanner] ✅ interact '\(r.text)' conf=\(r.confidence) cx=\(r.cx) labelY=\(r.cy) h=\(r.height) clickY=\(clickY)")
+            // Primary click target: icon centre = text_cy - 35 px (above the word).
+            // We also click further above and below to cover NPC body / game raycast.
+            let iconCenterY = max(r.cy - 35, Zones.hudTopYMax + 5)
+            let clickY      = iconCenterY
+            print("[Scanner] \u2705 interact '\(r.text)' conf=\(r.confidence) cx=\(r.cx) labelY=\(r.cy) h=\(r.height) iconY=\(clickY)")
             return .interact(cx: r.cx, cy: clickY, label: r.text, labelY: r.cy)
         }
         return nil

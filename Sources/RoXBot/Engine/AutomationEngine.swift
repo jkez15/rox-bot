@@ -207,23 +207,23 @@ final class AutomationEngine {
             dashboard.incrementActions()
 
         case .interact(let cx, let cy, let label, let labelY):
-            // The NPC sign is display-only — the game picks NPCs via Physics.Raycast
-            // against the 3D model collider.  The model sits BELOW the floating sign.
+            // From the reference screenshot the NPC sign card layout is:
+            //   [  icon (magnifying glass)  ]   ← card centre, ~35px above text
+            //   [       "Investigate"       ]   ← text at bottom of card (labelY)
+            //   … NPC model body below …
             //
-            // On a 320 px-tall game world (y 300–620) the sign-to-feet distance is
-            // ~200 px.  We fan 5 clicks across the full vertical range below the sign
-            // to guarantee at least one hits the 3D collider:
-            //   • cy        = sign + 130 px  (chest / primary)
-            //   • cy + 50   = sign + 180 px  (waist / legs)
-            //   • cy - 40   = sign +  90 px  (head / upper body)
-            //   • labelY + 30 = just below sign text (in case sign IS clickable)
-            //   • labelY     = on the sign text itself
-            let waist = min(cy + 50, Zones.gameWorldYMax - 5)
-            let upper = max(cy - 40, Zones.hudTopYMax + 5)
-            let belowSign = min(labelY + 30, Zones.gameWorldYMax - 5)
+            // cy = icon centre (labelY - 35).  We fan 5 clicks to cover:
+            //   1. Icon centre         (cy)          ← primary: the sign card itself
+            //   2. Card top            (cy - 25)     ← upper portion of sign card
+            //   3. Card bottom / text  (labelY)      ← the text word itself
+            //   4. Just below text     (labelY + 30) ← below card, maybe NPC head
+            //   5. NPC body estimate   (labelY + 80) ← further below for model collider
+            let cardTop   = max(cy - 25, Zones.hudTopYMax + 5)
+            let belowText = min(labelY + 30, Zones.gameWorldYMax - 5)
+            let npcBody   = min(labelY + 80, Zones.gameWorldYMax - 5)
 
             dashboard.setAction("🖱 Interact: \(label)")
-            dashboard.log("🖱 Interact '\(label)' labelY=\(labelY)  clicks: \(upper),\(cy),\(waist),\(belowSign),\(labelY)")
+            dashboard.log("🖱 Interact '\(label)' iconY=\(cy) labelY=\(labelY) clicks: \(cardTop),\(cy),\(labelY),\(belowText),\(npcBody)")
 
             // Record attempt for calibrator learning
             await ClickCalibrator.shared.recordAttempt(
@@ -231,16 +231,16 @@ final class AutomationEngine {
                 offsetUsed: cy - labelY, frameNumber: frameNumber
             )
 
-            // 5-click fan from upper body to sign text
-            await ClickEngine.click(wx: cx, wy: cy, windowBounds: bounds)
+            // 5-click fan: icon card → text → NPC body
+            await ClickEngine.click(wx: cx, wy: cy, windowBounds: bounds)        // icon centre
             try? await Task.sleep(for: .milliseconds(200))
-            await ClickEngine.click(wx: cx, wy: waist, windowBounds: bounds)
+            await ClickEngine.click(wx: cx, wy: cardTop, windowBounds: bounds)   // card top
             try? await Task.sleep(for: .milliseconds(200))
-            await ClickEngine.click(wx: cx, wy: upper, windowBounds: bounds)
+            await ClickEngine.click(wx: cx, wy: labelY, windowBounds: bounds)    // text label
             try? await Task.sleep(for: .milliseconds(200))
-            await ClickEngine.click(wx: cx, wy: belowSign, windowBounds: bounds)
+            await ClickEngine.click(wx: cx, wy: belowText, windowBounds: bounds) // below card
             try? await Task.sleep(for: .milliseconds(200))
-            await ClickEngine.click(wx: cx, wy: labelY, windowBounds: bounds)
+            await ClickEngine.click(wx: cx, wy: npcBody, windowBounds: bounds)   // NPC model
             dashboard.incrementActions()
 
         case .action(let cx, let cy, let label):
