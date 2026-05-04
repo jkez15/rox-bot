@@ -251,9 +251,14 @@ struct QuestScanner {
                 print("[Scanner] interaction '\(r.text)' conf=\(r.confidence) rejected zone cx=\(r.cx) cy=\(r.cy)")
                 continue
             }
-            // Click ~60 px above the text label — that's where the icon hitbox sits in RöX.
-            let clickY = max(r.cy - 60, Zones.hudTopYMax + 5)
-            print("[Scanner] ✅ interact '\(r.text)' conf=\(r.confidence) cx=\(r.cx) labelY=\(r.cy) clickY=\(clickY)")
+            // The OCR region is the TEXT LABEL at the bottom of the NPC sign card.
+            // The tappable icon sits above it. In RöX the icon is roughly 3–4× the
+            // label's own height above the label baseline — scale with r.height so this
+            // works at any window size / zoom level.
+            // Minimum offset 80 px; maximum clamped to just below the HUD top bar.
+            let offset   = max(80, r.height * 4)
+            let clickY   = max(r.cy - offset, Zones.hudTopYMax + 5)
+            print("[Scanner] ✅ interact '\(r.text)' conf=\(r.confidence) cx=\(r.cx) labelY=\(r.cy) h=\(r.height) clickY=\(clickY)")
             return .interact(cx: r.cx, cy: clickY, label: r.text)
         }
         return nil
