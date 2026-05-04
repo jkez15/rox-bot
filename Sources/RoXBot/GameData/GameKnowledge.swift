@@ -22,6 +22,19 @@ struct NPCMeta {
     let hasDialogue:     Bool      // true if defaultDialogueIdList is non-empty
 }
 
+/// Derived catalog row from npc_interactive_catalog.csv.
+/// Adds icon keys (e.g. "icon_entrust", "icon_NPC_0") that the game's minimap uses.
+struct NPCInteractive {
+    let npcGuid:     Int
+    let sceneId:     Int
+    let sceneX:      Float
+    let sceneZ:      Float
+    let staticId:    Int
+    let icon1:       String   // e.g. "icon_entrust"
+    let icon2:       String   // e.g. "icon_entrust_L"
+    let isInteractive: Bool
+}
+
 // MARK: - Known scene IDs
 enum SceneID {
     static let prontera  = 1010
@@ -80,6 +93,12 @@ final class GameKnowledge {
     /// NPC metadata from npc_raw.txt (type, signContent, etc.)
     private(set) var npcMeta: [Int: NPCMeta] = [:]
 
+    /// Interactive NPC catalog from npc_interactive_catalog.csv (icon keys, interactivity)
+    private(set) var npcInteractive: [Int: NPCInteractive] = [:]
+
+    /// All unique icon keys that appear on interactive NPCs (e.g. "icon_entrust")
+    private(set) var knownInteractiveIconKeys: Set<String> = []
+
     func load() {
         let base = bundleDumpsURL()
 
@@ -100,6 +119,15 @@ final class GameKnowledge {
         } else {
             print("[GameKnowledge] ⚠️ npc_raw.txt not found — NPC metadata unavailable")
         }
+
+        // 3. Interactive NPC catalog (icon keys, interactivity flags)
+        let catalogURL = base.appendingPathComponent("npc_interactive_catalog.csv")
+        if let text = try? String(contentsOf: catalogURL, encoding: .utf8) {
+            parseInteractiveCatalog(text)
+            print("[GameKnowledge] Loaded \(npcInteractive.count) interactive NPC entries (\(knownInteractiveIconKeys.count) icon keys)")
+        } else {
+            print("[GameKnowledge] ⚠️ npc_interactive_catalog.csv not found")
+        }
     }
 
     func npcsInScene(_ sceneId: Int) -> [SceneNPC] {
@@ -112,6 +140,28 @@ final class GameKnowledge {
 
     func meta(staticId: Int) -> NPCMeta? {
         npcMeta[staticId]
+    }
+
+    /// Returns the icon key for a given NPC uniqueId (e.g. "icon_entrust").
+    func iconKey(for npcUniqueId: Int) -> String? {
+        guard let entry = npcInteractive[npcUniqueId], !entry.icon1.isEmpty else { return nil }
+        return entry.icon1
+    }
+
+    /// Returns true if a given NPC is marked interactive in the catalog.
+    func isInteractive(_ npcUniqueId: Int) -> Bool {
+        npcInteractive[npcUniqueId]?.isInteractive ?? true  // default true if unknown
+    }
+
+    /// Returns the commission board NPC closest to the given scene/position.
+    func nearestCommissionBoard(sceneId: Int, x: Float, z: Float) -> SceneNPC? {
+        npcsInScene(sceneId)
+            .filter { Self.commissionBoardIds.contains($0.uniqueId) }
+            .min { a, b in
+                let da = (a.x - x) * (a.x - x) + (a.z - z) * (a.z - z)
+                let db = (b.x - x) * (b.x - x) + (b.z - z) * (b.z - z)
+                return da < db
+            }
     }
 
     /// Returns true if the given NPC uniqueId is a commission board.
@@ -172,7 +222,7 @@ final class GameKnowledge {
                 }
             }
             if t.hasPrefix("[\"signContent\"] =") {
-                sign = t.components(separatedBy: "\"").dropFirst(3).first.map(String.init) ?? ""
+                sign = t.components(separatedBy: "\"").dropFirst(3).first.map { String($0) } ?? ""
             }
             if t.hasPrefix("[\"dialogueradius\"] =") {
                 if let v = Float(t.components(separatedBy: "=").last?.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "") ?? "") {
@@ -187,6 +237,39 @@ final class GameKnowledge {
         if let id = currentId {
             npcMeta[id] = NPCMeta(staticId: id, type: type, signContent: sign,
                                   dialogueRadius: radius, hasDialogue: hasDialogue)
+        }
+    }
+
+    // MARK: - Parse npc_interactive_catalog.csv
+
+    private func parseInteractiveCatalog(_ text: String) {
+        // Columns: entry_key,npc_guid,scene_id,scene_x,scene_z,scene_name_key,
+        //          static_id,npc_name_key,sign_content_key,sign_icon_id,icon1,icon2,is_interactive
+        var first = true
+        for line in text.components(separatedBy: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            guard !t.isEmpty else { continue }
+            if first { first = false; continue }  // skip header
+            let cols = t.components(separatedBy: ",")
+            guard cols.count >= 13,
+                  let guid    = Int(cols[1]),
+                  let sceneId = Int(cols[2]),
+                  let sceneX  = Float(cols[3]),
+                  let sceneZ  = Float(cols[4]),
+                  let staticId = Int(cols[6])
+            else { continue }
+            let icon1         = cols[10].trimmingCharacters(in: .whitespaces)
+            let icon2         = cols[11].trimmingCharacters(in: .whitespaces)
+            let isInteractive = cols[12].trimmingCharacters(in: .whitespaces) == "1"
+            let entry = NPCInteractive(npcGuid: guid, sceneId: sceneId,
+                                       sceneX: sceneX, sceneZ: sceneZ,
+                                       staticId: staticId,
+                                       icon1: icon1, icon2: icon2,
+                                       isInteractive: isInteractive)
+            npcInteractive[guid] = entry
+            if isInteractive && !icon1.isEmpty {
+                knownInteractiveIconKeys.insert(icon1)
+            }
         }
     }
 

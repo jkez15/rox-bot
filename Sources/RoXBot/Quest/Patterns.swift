@@ -115,6 +115,58 @@ enum Patterns {
         #"Refresh"#,
     ]
 
+    // MARK: - Daily reward / golden chest popup
+    // Matches the "Collect" / "Claim" / "Receive Reward" buttons on daily login popups,
+    // achievement chests, and event reward banners.
+    // Zone: anywhere outside the sidebar (cx > questPanelXMax) — popup can appear center-screen.
+    static let dailyReward: [String] = [
+        #"Daily\s*Reward"#,
+        #"Daily\s*Login"#,
+        #"Login\s*Reward"#,
+        #"Sign.in\s*Reward"#,
+        #"Attendance\s*Reward"#,
+        #"Golden\s*Chest"#,
+        #"Event\s*Reward"#,
+        #"Lucky\s*Draw"#,
+    ]
+
+    // Buttons that appear ON daily reward / event popups to collect the reward.
+    // These are more specific than the generic action buttons to avoid false positives.
+    static let dailyRewardCollect: [String] = [
+        #"Collect\s*Now"#,
+        #"Claim\s*Now"#,
+        #"Receive\s*Now"#,
+        #"Get\s*Reward"#,
+        #"One.?tap\s*Collect"#,
+        #"Claim\s*All"#,
+        #"Collect\s*All"#,
+    ]
+
+    // MARK: - Party invite auto-accept
+    // Matches the party invite popup title.
+    static let partyInvite: [String] = [
+        #"Party\s*Invite"#,
+        #"Team\s*Invite"#,
+        #"Group\s*Invite"#,
+        #"Invite.*to.*Party"#,
+        #"Invite.*to.*Team"#,
+    ]
+    // The accept button on party invite popups.
+    static let partyAccept: [String] = [
+        #"\bJoin\b"#,
+        #"\bAccept\b"#,   // safe here because we already confirmed partyInvite is present
+    ]
+
+    // MARK: - Dungeon / instance entry prompt
+    // Matches the "Enter dungeon" / "Challenge" entry screen.
+    static let dungeonEntry: [String] = [
+        #"Enter\s*Dungeon"#,
+        #"Enter\s*Instance"#,
+        #"Challenge\s*Mode"#,
+        #"Ready\s*to\s*Enter"#,
+        #"Confirm\s*Entry"#,
+    ]
+
     // MARK: - Helpers
 
     static func matches(_ text: String, pattern: String) -> Bool {

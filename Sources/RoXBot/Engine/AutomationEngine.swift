@@ -115,6 +115,9 @@ final class AutomationEngine {
         let regions = await OCREngine.recognize(image, minConfidence: 0.30)
         print("[Engine] OCR found \(regions.count) regions: \(regions.prefix(5).map(\.text))")
 
+        // 1b. Auto-potion — pixel-based HP/SP check (runs in autoPotion mode OR always)
+        let potionAction = checkPotionNeeded(image: image, mode: dashboard.selectedMode)
+
         // 2. Build context from OCR + live game state
         let mode = dashboard.selectedMode
         let context = ScreenContext(
@@ -138,12 +141,23 @@ final class AutomationEngine {
             dashboard.setStatus("Running — monitoring…")
         }
 
-        // 5. Deduplicate + rate limit
+        // 5. Potion takes highest priority — fire immediately if needed (no dedup coords)
+        if let potion = potionAction {
+            let shouldAct = await queue.shouldExecute(potion)
+            if shouldAct {
+                await queue.record(potion)
+                print("[Engine] Action: \(potion)")
+                await execute(potion, bounds: bounds)
+                return  // skip quest action this frame; next frame will re-scan
+            }
+        }
+
+        // 6. Deduplicate + rate limit quest action
         let shouldAct = await queue.shouldExecute(action)
         guard shouldAct else { return }
         await queue.record(action)
 
-        // 6. Execute
+        // 7. Execute
         print("[Engine] Action: \(action)")
         await execute(action, bounds: bounds)
     }
@@ -196,6 +210,107 @@ final class AutomationEngine {
             dashboard.incrementActions()
             // Wait for pathfinding to start before next scan cycle
             try? await Task.sleep(for: .seconds(2))
+
+        case .usePotion(let kind):
+            let key   = kind == .hp ? Zones.hpPotionKey : Zones.spPotionKey
+            let label = kind == .hp ? "HP" : "SP"
+            dashboard.setAction("🧪 Potion: \(label)")
+            dashboard.log("🧪 \(label) potion (key \(key))")
+            pressKey(key)
+            dashboard.incrementActions()
         }
+    }
+
+    // MARK: - HP/SP bar pixel analysis
+
+    /// Reads the HP and SP bars from the captured frame and returns a `.usePotion` action
+    /// if either bar is below its threshold. Returns nil if both bars are fine.
+    ///
+    /// The HP bar is ~red pixels, SP bar is ~blue pixels, within the top-left HUD region.
+    /// Fill ratio = (filled pixels) / (total pixels in bar rectangle).
+    private func checkPotionNeeded(image: CGImage, mode: AutomationMode) -> ScanAction? {
+        // Always check potions regardless of mode — healing is always needed.
+        let hpFill = barFillRatio(image: image,
+                                   x1: Zones.hpBarX1, y1: Zones.hpBarY1,
+                                   x2: Zones.hpBarX2, y2: Zones.hpBarY2,
+                                   channel: .red)
+        if let fill = hpFill, fill < Zones.hpPotionThreshold {
+            print("[Engine] HP bar at \(Int(fill * 100))% — using HP potion")
+            return .usePotion(kind: .hp)
+        }
+
+        let spFill = barFillRatio(image: image,
+                                   x1: Zones.spBarX1, y1: Zones.spBarY1,
+                                   x2: Zones.spBarX2, y2: Zones.spBarY2,
+                                   channel: .blue)
+        if let fill = spFill, fill < Zones.spPotionThreshold {
+            print("[Engine] SP bar at \(Int(fill * 100))% — using SP potion")
+            return .usePotion(kind: .sp)
+        }
+
+        return nil
+    }
+
+    private enum Channel { case red, blue }
+
+    /// Samples pixels in the given rect and returns the fraction that are "lit" in the target channel.
+    /// Returns nil if the image region is inaccessible.
+    private func barFillRatio(image: CGImage, x1: Int, y1: Int, x2: Int, y2: Int,
+                               channel: Channel) -> Float? {
+        let w = x2 - x1
+        let h = y2 - y1
+        guard w > 0, h > 0 else { return nil }
+
+        // Crop to the bar region
+        guard let cropped = image.cropping(to: CGRect(x: x1, y: y1, width: w, height: h))
+        else { return nil }
+
+        // Render into a raw RGBA bitmap
+        let bw = cropped.width
+        let bh = cropped.height
+        let bytesPerPixel = 4
+        let bytesPerRow   = bw * bytesPerPixel
+        var pixelData = [UInt8](repeating: 0, count: bh * bytesPerRow)
+
+        guard let ctx = CGContext(
+            data: &pixelData,
+            width: bw, height: bh,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+
+        ctx.draw(cropped, in: CGRect(x: 0, y: 0, width: bw, height: bh))
+
+        var litCount = 0
+        let total = bw * bh
+        for i in 0..<total {
+            let base = i * bytesPerPixel
+            let r = Int(pixelData[base])
+            let g = Int(pixelData[base + 1])
+            let b = Int(pixelData[base + 2])
+            switch channel {
+            case .red:
+                // HP bar: red dominant (r > 100, r > g+40, r > b+40)
+                if r > 100 && r > g + 40 && r > b + 40 { litCount += 1 }
+            case .blue:
+                // SP bar: blue dominant (b > 80, b > r+30, b > g+10)
+                if b > 80 && b > r + 30 && b > g + 10 { litCount += 1 }
+            }
+        }
+
+        return Float(litCount) / Float(max(total, 1))
+    }
+
+    // MARK: - Key press helper
+
+    private func pressKey(_ keyCode: CGKeyCode) {
+        let src = CGEventSource(stateID: .hidSystemState)
+        let down = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: true)
+        let up   = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: false)
+        down?.post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: 0.05)
+        up?.post(tap: .cghidEventTap)
     }
 }

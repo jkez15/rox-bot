@@ -43,7 +43,13 @@ struct QuestState {
 
     /// True when the sidebar shows a distance and it's ≤ this threshold (units).
     /// At distance 0 the NPC should be right next to the character.
-    var isAtTarget: Bool { (distance ?? Int.max) <= 5 }
+    /// True when the sidebar shows a non-zero distance ≤ 5 m.
+    /// At distance 0 we deliberately return false — the bot re-taps the quest row to
+    /// immediately trigger NPC interaction instead of waiting for the next scan cycle.
+    var isAtTarget: Bool {
+        guard let d = distance else { return false }
+        return d >= 1 && d <= 5
+    }
     var hasActiveQuest: Bool { !title.isEmpty }
 }
 
@@ -69,6 +75,13 @@ enum ScanAction: CustomStringConvertible {
     case interact(cx: Int, cy: Int, label: String)
     case action(cx: Int, cy: Int, label: String)
     case navigate(cx: Int, cy: Int, label: String)
+    /// Press a potion hotkey (no click coords — sends a CGEvent keypress).
+    case usePotion(kind: PotionKind)
+
+    enum PotionKind: String {
+        case hp = "HP"
+        case sp = "SP"
+    }
 
     var description: String {
         switch self {
@@ -80,6 +93,7 @@ enum ScanAction: CustomStringConvertible {
         case .interact(let x, let y, let l):    return "interact(\(x),\(y)) '\(l)'"
         case .action(let x, let y, let l):      return "action(\(x),\(y)) '\(l)'"
         case .navigate(let x, let y, let l):    return "navigate(\(x),\(y)) '\(l)'"
+        case .usePotion(let k):                 return "usePotion(\(k.rawValue))"
         }
     }
 

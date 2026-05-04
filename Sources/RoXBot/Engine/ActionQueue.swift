@@ -23,6 +23,7 @@ actor ActionQueue {
         case .interact:                return .seconds(3)
         case .action:                  return .seconds(5)
         case .navigate:                return .seconds(15)
+        case .usePotion:               return .seconds(8)   // cooldown between presses
         default:                       return .seconds(10)
         }
     }
@@ -81,7 +82,7 @@ actor ActionQueue {
 // MARK: - Helpers
 
 private enum ActionKind: Equatable {
-    case none, pathfinding, titleScreen, dialog, dismiss, interact, action, navigate
+    case none, pathfinding, titleScreen, dialog, dismiss, interact, action, navigate, usePotion
 
     init(_ s: ScanAction) {
         switch s {
@@ -93,6 +94,7 @@ private enum ActionKind: Equatable {
         case .interact:    self = .interact
         case .action:      self = .action
         case .navigate:    self = .navigate
+        case .usePotion:   self = .usePotion
         }
     }
 

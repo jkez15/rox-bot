@@ -45,6 +45,21 @@ struct QuestScanner {
             return (quest, action)
         }
 
+        // ── Step 0.75: Daily reward / event chest — collect if visible ─────
+        if let action = dailyRewardButton(regions) {
+            return (quest, action)
+        }
+
+        // ── Step 0.8: Party invite auto-accept ────────────────────────────
+        if let action = partyInviteButton(regions) {
+            return (quest, action)
+        }
+
+        // ── Step 0.9: Dungeon / instance entry confirm ────────────────────
+        if let action = dungeonEntryButton(regions) {
+            return (quest, action)
+        }
+
         // ── Step 1: Dialog / conversation choice button ────────────────────
         if let action = dialogButton(regions) {
             return (quest, action)
@@ -120,6 +135,66 @@ struct QuestScanner {
                r.cx > 500,
                r.cy < 500 {
                 return .dismiss(cx: r.cx, cy: r.cy, label: r.text)
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Step 0.75 – daily reward / event chest collect
+
+    private static func dailyRewardButton(_ regions: [TextRegion]) -> ScanAction? {
+        // First look for specific collect-now buttons that appear on reward popups.
+        for pattern in Patterns.dailyRewardCollect {
+            if let r = OCREngine.find(regions, pattern: pattern, minConfidence: confDialog),
+               r.cx > Zones.questPanelXMax {
+                return .action(cx: r.cx, cy: r.cy, label: r.text)
+            }
+        }
+        // If a reward popup TITLE is visible but no specific collect button yet, look for
+        // a generic "Collect" or "Claim" near the popup (must be center-screen).
+        let hasRewardPopup = Patterns.dailyReward.contains {
+            OCREngine.find(regions, pattern: $0, minConfidence: confDialog) != nil
+        }
+        if hasRewardPopup {
+            // Look for collect/claim in any action button within popup area
+            for pattern in [#"Collect\b"#, #"\bClaim\b"#, #"Receive\b"#] {
+                if let r = OCREngine.find(regions, pattern: pattern, minConfidence: confAction),
+                   r.cx > Zones.questPanelXMax,
+                   r.cy > 200, r.cy < 700 {
+                    return .action(cx: r.cx, cy: r.cy, label: r.text)
+                }
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Step 0.8 – party invite auto-accept
+
+    private static func partyInviteButton(_ regions: [TextRegion]) -> ScanAction? {
+        // Only fire if a party invite popup title is visible
+        guard Patterns.partyInvite.contains(where: {
+            OCREngine.find(regions, pattern: $0, minConfidence: confDialog) != nil
+        }) else { return nil }
+        for pattern in Patterns.partyAccept {
+            if let r = OCREngine.find(regions, pattern: pattern, minConfidence: confDialog),
+               r.cx > Zones.questPanelXMax {
+                return .dialog(cx: r.cx, cy: r.cy, label: "Party: \(r.text)")
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Step 0.9 – dungeon / instance entry confirm
+
+    private static func dungeonEntryButton(_ regions: [TextRegion]) -> ScanAction? {
+        guard Patterns.dungeonEntry.contains(where: {
+            OCREngine.find(regions, pattern: $0, minConfidence: confDialog) != nil
+        }) else { return nil }
+        // Look for an Enter / Challenge / Confirm button
+        for pattern in [#"\bEnter\b"#, #"\bChallenge\b"#, #"\bConfirm\b"#, #"\bReady\b"#] {
+            if let r = OCREngine.find(regions, pattern: pattern, minConfidence: confAction),
+               r.cx > Zones.questPanelXMax {
+                return .action(cx: r.cx, cy: r.cy, label: "Dungeon: \(r.text)")
             }
         }
         return nil
