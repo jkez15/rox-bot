@@ -22,6 +22,19 @@ Requires RöX installed at `~/Library/Containers/com.play.rosea/Data/Documents/B
 | `waypoints_raw.txt` | Raw Lua source for route waypoints (posx/posy/posz) |
 | `all_script_names_*.txt` | Index of every Lua TextAsset in each bundle |
 
+## Derived offline catalogs
+
+These are committed helper files generated from the raw dumps so the non-Mac
+machine can do research without re-parsing the large Lua tables.
+
+| File | Contents |
+|---|---|
+| `npc_interactive_catalog.csv` | Per-NPC lookup: `npc_guid`, `scene_id`, scene position, `icon1`, `icon2`, `sign_content_key`, `sign_icon_id`, `is_interactive` |
+| `npc_icon_key_summary.csv` | Unique NPC icon keys with counts and sample NPC IDs / name keys |
+| `entrust_npc_icon_catalog.csv` | Commission board NPC IDs joined with `npcIcon` IDs, scene coordinates, and NPC icon keys |
+| `recurring_quest_icon_catalog.csv` | Recurring quest entries that expose `icon`, `monsterId`, or `collectNpc` fields |
+| `game_asset_hints.txt` | Installed app asset container paths and decompiled code path hints for future Unity extraction |
+
 ## Key data for automation
 
 ### NPC scene positions (`npc_scene.txt`)
@@ -53,6 +66,28 @@ These 12 uniqueIds accept/give commission quests (one per zone):
 ### Route waypoints (`waypoints_raw.txt`)
 Per-zone route tables with `posx`, `posy`, `posz` for auto-pathing.
 These are the same coordinate space as SceneNPC positions.
+
+### NPC icon keys (`npc_interactive_catalog.csv`, `npc_icon_key_summary.csv`)
+These files expose stable icon names such as `icon_entrust`, `icon_blacksmith`,
+`icon_weapon`, `icon_sale`, and `icon_NPC_0`.
+
+They are useful for:
+- mapping OCR labels to likely icon families
+- deciding which UI elements deserve template matching instead of OCR only
+- preparing future Unity asset extraction from hashed bundles
+
+### Game asset extraction hints (`game_asset_hints.txt`)
+This file records the app-side container paths observed on the live Mac:
+- `RX.app/Data/data.unity3d`
+- `RX.app/Data/resources.resource`
+- `RX.app/Data/Raw/IOS/*.bundle`
+
+It also records relevant decompiled path strings like:
+- `UI/Prefabs/Npc/NpcSign.prefab`
+- `Icons/MapNpcIcon/icon_NPC_0`
+
+These are the bridge between the offline dump files and any future real sprite
+extraction from the installed game.
 
 ## Localization note
 The English/Thai/Vietnamese localization scripts (`debug_en_translate`,

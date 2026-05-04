@@ -1,0 +1,33 @@
+# game_asset_hints.txt
+# Generated from local app install + decompiled code references.
+# Purpose: give the non-Mac machine concrete locations / path keys for future Unity asset extraction.
+
+Installed app bundle:
+- /Applications/RöX.app/Wrapper/RX.app
+
+Relevant game asset containers:
+- RX.app/Data/data.unity3d
+- RX.app/Data/resources.resource
+- RX.app/Data/Raw/IOS/*.bundle  (12148 hashed bundles on this machine)
+
+Relevant code paths from decompiled Assembly-CSharp:
+- UI prefab for overhead NPC sign: UI/Prefabs/Npc/NpcSign.prefab
+- Default map endpoint icon: Icons/MapNpcIcon/icon_NPC_0
+- Dynamic map endpoint icon base: Icons/MapNpcIcon/{AutoPathEndPointIconPath}
+- NPC sign text source: LanguageManager.GetString(info.GetSignContent())
+- NPC sign icon source: info.GetSignIconId()
+
+Useful raw dump files to join against:
+- npc_interactive_catalog.csv
+- npc_icon_key_summary.csv
+- entrust_npc_icon_catalog.csv
+- recurring_quest_icon_catalog.csv
+- npc_scene.txt
+- npc_raw.txt
+- recurring_quests_raw.txt
+- entrust_raw.txt
+
+Why this matters for recognition:
+- Overhead labels use localization keys like Sign61001 / NpcName40050 before translation.
+- Map and NPC icons use stable asset keys like icon_entrust, icon_blacksmith, icon_NPC_0.
+- Unity stores the real sprites inside hashed bundles, so these key names are the bridge between OCR/template matching and extracted assets.
